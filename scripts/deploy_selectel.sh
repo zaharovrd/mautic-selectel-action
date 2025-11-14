@@ -151,7 +151,14 @@ scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" deploy.env docker-comp
 scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" build/setup root@${VPS_IP}:/var/www/setup
 ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && chmod +x setup"
 echo "⚙️  Running setup on server..."
-ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && nohup ./setup > /var/log/setup-dc.log 2>&1 &"
+ssh -f -o StrictHostKeyChecking=no \
+   -o ExitOnForwardFailure=yes \
+   -i "${TEMP_SSH_KEY_PATH}" \
+   root@${VPS_IP} \
+   "cd /var/www && nohup ./setup > /var/log/setup-dc.log 2>&1"
+
+echo "⏳ Waiting a moment for the remote process to initialize..."
+sleep 10
 
 echo "📊 Monitoring setup progress..."
 # ======================== REVISED MONITORING BLOCK ========================
