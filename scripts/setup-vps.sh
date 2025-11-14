@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-#      VPS PREPARATION SCRIPT
+#      VPS PREPARATION SCRIPT (REVISED)
 # ==============================================================================
 
 set -e
@@ -40,19 +40,19 @@ apt-get install -y \
   curl wget unzip git nano htop cron netcat vim
 
 echo "💾 Creating swap file for memory-intensive operations..."
-if [ ! -f /swapfile ]; then
+if ! grep -q "/swapfile" /etc/fstab; then
     echo "Creating 2GB swap file..."
     fallocate -l 2G /swapfile
     chmod 600 /swapfile
     mkswap /swapfile
     swapon /swapfile
     echo '/swapfile none swap sw 0 0' >> /etc/fstab
-    echo 'vm.swappiness=10' >> /etc/sysctl.conf
     sysctl vm.swappiness=10
+    echo 'vm.swappiness=10' >> /etc/sysctl.conf
     echo "✅ Swap file created and configured"
     free -h
 else
-    echo "Swap file already exists"
+    echo "✅ Swap file already exists."
 fi
 
 echo "🔥 Configuring firewall..."
@@ -75,20 +75,21 @@ mkdir -p /etc/nginx/sites-available
 mkdir -p /etc/nginx/sites-enabled
 rm -f /etc/nginx/sites-enabled/default
 
-# Configure SSH to allow root login
-sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-sed -i 's/^PermitRootLogin no/PermitRootLogin yes/' /etc/ssh/sshd_config
-systemctl restart ssh
+# Configure SSH to allow root login. Use reload instead of restart for safety.
+sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+systemctl reload sshd
 
 echo "📁 Creating deployment directories..."
 mkdir -p /var/www
 mkdir -p /var/log
 chown -R root:root /var/www
-chmod 755 /dev
+
+# --- DANGEROUS COMMAND REMOVED ---
+# The line 'chmod 755 /dev' was here. It is harmful and has been removed.
 
 echo "🧹 Cleaning up..."
 apt-get autoremove -y
-apt-get autoclean
+apt-get autoclean -y
 
 echo "✅ VPS setup completed successfully"
 echo "🔍 Docker service status: $(systemctl is-active docker)"

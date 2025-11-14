@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-#      MAUTIC DEPLOYMENT SCRIPT FOR SELECTEL
+#      MAUTIC DEPLOYMENT SCRIPT FOR SELECTEL (REVISED)
 # ==============================================================================
 
 set -e
@@ -151,31 +151,63 @@ scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" deploy.env docker-comp
 scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" build/setup root@${VPS_IP}:/var/www/setup
 ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && chmod +x setup"
 echo "⚙️  Running setup on server..."
-ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && nohup ./setup > /var/log/setup-dc.log 2>&1 &"
+ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && nohup ./setup > /var/log/setup-dc.log 2>&1 &"
+
 echo "📊 Monitoring setup progress..."
-TIMEOUT=900; COUNTER=0; SUCCESS=false
-while [ $COUNTER -lt $TIMEOUT ]; do
-    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "grep -q '🎉 Mautic setup completed successfully' /var/log/setup-dc.log 2>/dev/null"; then
-        echo "✅ Setup completed successfully!"; SUCCESS=true; break;
+# ======================== REVISED MONITORING BLOCK ========================
+# Execute the monitoring loop on the remote server within a single SSH session.
+# This is more robust and avoids "Broken pipe" errors.
+SSH_COMMAND_TO_MONITOR="
+TIMEOUT=900
+COUNTER=0
+SUCCESS_MSG='🎉 Mautic setup completed successfully'
+LOG_FILE='/var/log/setup-dc.log'
+
+while [ \$COUNTER -lt \$TIMEOUT ]; do
+    if [ -f \"\$LOG_FILE\" ] && grep -q \"\$SUCCESS_MSG\" \"\$LOG_FILE\"; then
+        echo '✅ Setup completed successfully!'
+        exit 0
     fi
-    if ! ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "pgrep -f './setup' > /dev/null 2>&1"; then
-        if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "grep -q '🎉 Mautic setup completed successfully' /var/log/setup-dc.log 2>/dev/null"; then SUCCESS=true; fi
-        break
+    
+    # Check if the setup process is still running
+    if ! pgrep -f './setup' > /dev/null; then
+        # Process ended, check one last time for success message
+        if [ -f \"\$LOG_FILE\" ] && grep -q \"\$SUCCESS_MSG\" \"\$LOG_FILE\"; then
+            echo '✅ Setup process finished and was successful!'
+            exit 0
+        else
+            echo '❌ Setup process ended unexpectedly without success message.'
+            exit 1
+        fi
     fi
-    echo "⏳ Setup running..."
+    
+    echo '⏳ Setup running... (waiting 30s)'
     sleep 30
-    COUNTER=$((COUNTER + 30))
+    COUNTER=\$((COUNTER + 30))
 done
-echo "📥 Downloading setup log..."
-scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP}:/var/log/setup-dc.log ./setup-dc.log > /dev/null 2>&1 || echo "Could not retrieve log file."
-if [ "$SUCCESS" = true ]; then
-    echo "🎉 Deployment completed successfully!"
-else
-    echo "❌ Deployment failed or timed out."; tail -n 50 ./setup-dc.log; exit 1;
+
+echo '❌ Deployment timed out after \$TIMEOUT seconds.'
+exit 1
+"
+
+if ! ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "${SSH_COMMAND_TO_MONITOR}"; then
+    echo "❌ Deployment script on server failed or timed out."
+    echo "📥 Downloading final part of setup log for analysis..."
+    scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP}:/var/log/setup-dc.log ./setup-dc.log > /dev/null 2>&1 || echo "Could not retrieve log file."
+    echo "--- LOG START ---"
+    tail -n 100 ./setup-dc.log
+    echo "--- LOG END ---"
+    exit 1
 fi
+# =========================================================================
+
+echo "📥 Downloading full setup log..."
+scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP}:/var/log/setup-dc.log ./setup-dc.log > /dev/null 2>&1 || echo "Could not retrieve log file."
+
 if [ -n "$INPUT_DOMAIN" ]; then MAUTIC_URL="https://${INPUT_DOMAIN}"; else MAUTIC_URL="http://${VPS_IP}:${MAUTIC_PORT}"; fi
 echo "vps-ip=${VPS_IP}" >> $GITHUB_OUTPUT
 echo "mautic-url=${MAUTIC_URL}" >> $GITHUB_OUTPUT
 echo "deployment-log=./setup-dc.log" >> $GITHUB_OUTPUT
 echo "✅ Outputs set successfully"
-echo "🌐 Your Mautic instance should be available at: ${MAUTIC_URL}"
+echo "🎉 Deployment completed successfully!"
+echo "🌐 Your Mautic instance is available at: ${MAUTIC_URL}"

@@ -1,30 +1,30 @@
-# Mautic DigitalOcean Deploy Action
+# Mautic Selectel Deploy Action
 
-A GitHub Action to automatically deploy Mautic (open-source marketing automation) to DigitalOcean with zero configuration.
+A GitHub Action to automatically deploy Mautic (open-source marketing automation) to Selectel VDS with zero configuration.
 
 ## ✨ Features
 
 - 🚀 **One-click deployment** - Deploy Mautic in minutes, not hours
-- 🖥️ **Automatic VPS creation** - Creates and configures DigitalOcean droplets
+- 🖥️ **Automatic VDS creation** - Creates and configures Selectel droplets
 - 🔒 **SSL/HTTPS support** - Automatic Let's Encrypt SSL certificates (when domain provided)
 - 🐳 **Docker-based** - Reliable, containerized deployment with Apache
 - 📧 **Email ready** - Pre-configured for email marketing campaigns
 - 🎨 **Custom themes/plugins** - Support for custom Mautic extensions via Composer or direct GitHub/ZIP installation
 - 🏗️ **Custom Docker Images** - Automatically builds custom images with your plugins pre-installed (build-time approach)
 - ⚙️ **Cron jobs** - Automated background tasks for optimal performance
-- 📊 **Basic monitoring** - DigitalOcean monitoring, container logging, and deployment artifacts
+- 📊 **Basic monitoring** - Selectel monitoring, container logging, and deployment artifacts
 
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
 
-- DigitalOcean account with API token (see required permissions below)
-- SSH key pair for server access (uploaded to your DigitalOcean account)
+- Selectel account with API token (see required permissions below)
+- SSH key pair for server access (uploaded to your Selectel account)
 - Domain name (optional, can use IP address)
 
-#### DigitalOcean API Token Requirements
+#### Selectel API Token Requirements
 
-Your DigitalOcean API token must have the following permissions:
+Your Selectel API token must have the following permissions:
 
 **Required Scopes:**
 - `droplet:create` - Create new VPS instances
@@ -35,8 +35,8 @@ Your DigitalOcean API token must have the following permissions:
 - `domain:write` - Manage DNS records (if using custom domain)
 
 **How to create a token:**
-1. Go to DigitalOcean Control Panel → API → Personal Access Tokens
-2. Click "Generate New Token"
+1. Перейти на Selectel Настройки → Управление токенами (https://vds.selectel.ru/panel/settings/tokens/)
+2. Click "Создать токен"
 3. Set name (e.g., "GitHub Mautic Deploy")
 4. Select "Full Access" or manually select the scopes listed above
 5. Copy the token immediately (you won't see it again)
@@ -46,7 +46,7 @@ Your DigitalOcean API token must have the following permissions:
 Add these secrets to your GitHub repository (`Settings` → `Secrets and variables` → `Actions`):
 
 ```
-DIGITALOCEAN_TOKEN=your_do_api_token
+SELECTEL_TOKEN=your_do_api_token
 SSH_PRIVATE_KEY=your_ssh_private_key
 MAUTIC_PASSWORD=your_admin_password
 MYSQL_PASSWORD=your_mysql_password
@@ -63,9 +63,9 @@ For security, create a new SSH key specifically for this GitHub Action:
 # Generate a new SSH key (without passphrase for automation)
 ssh-keygen -t ed25519 -f ~/.ssh/mautic_deploy_key -N "" -C "mautic-github-action"
 
-# Add the public key to your DigitalOcean account
+# Add the public key to your Selectel account
 cat ~/.ssh/mautic_deploy_key.pub
-# Copy this output and add it in DigitalOcean Control Panel → Settings → Security → SSH Keys
+# Copy this output and add it in Selectel Control Panel → Settings → Security → SSH Keys
 ```
 
 **SSH_PRIVATE_KEY**: The content of your **dedicated** private SSH key
@@ -80,7 +80,7 @@ cat ~/.ssh/mautic_deploy_key.pub
 - 📝 Clear audit trail for automation access
 - 🔄 Can be rotated independently
 
-Make sure your SSH public key is already added to your DigitalOcean account before running the action.
+Make sure your SSH public key is already added to your Selectel account before running the action.
 
 ### 3. Create Workflow
 
@@ -113,7 +113,7 @@ jobs:
           mautic-password: ${{ secrets.MAUTIC_PASSWORD }}
           mysql-password: ${{ secrets.MYSQL_PASSWORD }}
           mysql-root-password: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          do-token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          do-token: ${{ secrets.Selectel_TOKEN }}
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 ```
 
@@ -130,20 +130,20 @@ jobs:
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `vps-name` | Name for the DigitalOcean droplet | `mautic-production` |
+| `vps-name` | Name for the Selectel droplet | `mautic-production` |
 | `email` | Admin email address | `admin@example.com` |
 | `mautic-password` | Admin password (use secrets!) | `${{ secrets.MAUTIC_PASSWORD }}` |
 | `mysql-password` | MySQL user password | `${{ secrets.MYSQL_PASSWORD }}` |
 | `mysql-root-password` | MySQL root password | `${{ secrets.MYSQL_ROOT_PASSWORD }}` |
-| `do-token` | DigitalOcean API token | `${{ secrets.DIGITALOCEAN_TOKEN }}` |
+| `do-token` | Selectel API token | `${{ secrets.Selectel_TOKEN }}` |
 | `ssh-private-key` | SSH private key for server access | `${{ secrets.SSH_PRIVATE_KEY }}` |
 
 ### Optional
 
 | Parameter | Description | Default | Example |
 |-----------|-------------|---------|---------|
-| `vps-size` | DigitalOcean droplet size | `s-2vcpu-2gb` | `s-4vcpu-8gb` |
-| `vps-region` | DigitalOcean region | `nyc1` | `fra1`, `lon1`, `sgp1` |
+| `vps-size` | Selectel droplet size | `s-2vcpu-2gb` | `s-4vcpu-8gb` |
+| `vps-region` | Selectel region | `nyc1` | `fra1`, `lon1`, `sgp1` |
 | `domain` | Custom domain name | _(uses IP)_ | `mautic.example.com` |
 | `mautic-version` | Mautic Docker image version | `6.0.5-apache` | `6.0.4-apache` |
 | `mautic-port` | Port for Mautic application | `8001` | `8080` |
@@ -428,23 +428,23 @@ mysql-root-password: ${{ secrets.MYSQL_ROOT_PASSWORD }}
 
 ### Common Issues
 
-**1. DigitalOcean API Permission Error**
+**1. Selectel API Permission Error**
 ```
 Error: You are missing the required permission ssh_key:read
 ```
-- Your DigitalOcean API token doesn't have sufficient permissions
+- Your Selectel API token doesn't have sufficient permissions
 - Generate a new token with "Full Access" or ensure it includes: `droplet:create`, `droplet:read`, `droplet:delete`, `ssh_key:read`, `domain:read`, `domain:write`
-- Update your `DIGITALOCEAN_TOKEN` secret with the new token
+- Update your `Selectel_TOKEN` secret with the new token
 
 **2. SSH Connection Failed**
 ```
 Error: Permission denied (publickey)
 ```
-- **Most Common Cause**: SSH private key doesn't match any key in your DigitalOcean account
-  - Ensure your SSH public key is added to DigitalOcean: Settings → Security → SSH Keys
+- **Most Common Cause**: SSH private key doesn't match any key in your Selectel account
+  - Ensure your SSH public key is added to Selectel: Settings → Security → SSH Keys
   - The action automatically generates the fingerprint and finds the matching key
 - Verify your SSH private key is correctly formatted in secrets (include the full key with headers)
-- Make sure your SSH public key is added to your DigitalOcean account **before** running the action
+- Make sure your SSH public key is added to your Selectel account **before** running the action
 - Use an SSH key without a passphrase for automation
 - Check the action logs for debugging information about key verification
 
@@ -471,11 +471,11 @@ If you're getting `Permission denied (publickey)` errors, follow these steps:
 # Generate fingerprint from your dedicated private key
 ssh-keygen -l -f ~/.ssh/mautic_deploy_key
 
-# View your public key (to add to DigitalOcean if missing)
+# View your public key (to add to Selectel if missing)
 cat ~/.ssh/mautic_deploy_key.pub
 ```
 
-**2. Check DigitalOcean SSH Keys**
+**2. Check Selectel SSH Keys**
 ```bash
 # List all SSH keys in your DO account
 doctl compute ssh-key list
@@ -491,7 +491,7 @@ doctl compute ssh-key list
   ... (rest of key content) ...
   -----END OPENSSH PRIVATE KEY-----
   ```
-- The action automatically finds the matching key in your DigitalOcean account
+- The action automatically finds the matching key in your Selectel account
 
 **4. Test SSH Connection Manually**
 ```bash
@@ -507,7 +507,7 @@ ssh -i ~/.ssh/mautic_deploy_key root@YOUR_VPS_IP
 
 ## 🔒 Security
 
-- Uses DigitalOcean's private networking
+- Uses Selectel's private networking
 - Automatic SSL/TLS encryption with Let's Encrypt
 - Database passwords are securely managed
 - Regular security updates via official Docker images
@@ -517,7 +517,7 @@ ssh -i ~/.ssh/mautic_deploy_key root@YOUR_VPS_IP
 
 The deployment includes basic monitoring:
 
-- DigitalOcean VPS monitoring (CPU, RAM, disk usage)
+- Selectel VPS monitoring (CPU, RAM, disk usage)
 - Docker container status monitoring
 - Application logs captured in `/var/www/logs`
 - Deployment log artifacts uploaded to GitHub Actions
@@ -565,5 +565,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [Mautic](https://mautic.org) - Open-source marketing automation
-- [DigitalOcean](https://digitalocean.com) - Cloud infrastructure
+- [Selectel](https://Selectel.com) - Cloud infrastructure
 - [Docker](https://docker.com) - Containerization platform
