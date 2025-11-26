@@ -1,4 +1,4 @@
-name: Deploy Mautic to Selectel
+name: Deploy or Update Mautic to Selectel
 
 on:
   workflow_dispatch:
@@ -18,6 +18,12 @@ on:
         description: 'Версия Docker-образа Mautic'
         required: true
         default: '6.0.5-apache'
+        
+      plugins:
+        description: 'Список URL плагинов для установки (каждый с новой строки)'
+        required: false
+        type: string
+
 
 jobs:
   deploy:
@@ -47,6 +53,8 @@ jobs:
           mautic-password: ${{ secrets.MAUTIC_PASSWORD }}
           mysql-password: ${{ secrets.MYSQL_PASSWORD }}
           mysql-root-password: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          # --- Плагины ---
+          plugins: ${{ github.event.inputs.plugins }} 
 
       - name: Show deployment results
         run: |
