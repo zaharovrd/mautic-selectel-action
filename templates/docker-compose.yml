@@ -2,11 +2,11 @@
 version: '3.8'
 
 x-mautic-volumes: &mautic-volumes
-  - mautic_data:/var/www/html
   - mautic_config:/var/www/html/config
+  - mautic_plugins:/var/www/html/docroot/plugins
+  - mautic_themes:/var/www/html/docroot/themes
+  - mautic_media:/var/www/html/docroot/media
   - ./logs:/var/www/html/var/logs
-  - mautic_media:/var/www/html/docroot/media/files
-  - mautic_media:/var/www/html/docroot/media/images
 
 services:
   db:
@@ -94,8 +94,9 @@ services:
       - mautic
 
 volumes:
-  mautic_data:
   mautic_config:
+  mautic_plugins:
+  mautic_themes:
   mautic_media:
   mysql_data:
 
