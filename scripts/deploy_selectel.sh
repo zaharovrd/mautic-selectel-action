@@ -166,11 +166,11 @@ echo "✅ Compiled successfully"
 # --- Шаг: Загрузка и применение кастомного перевода ---
 echo "🌐 Cloning custom language pack..."
 # Создаем временный SSH ключ для GitHub (если репозиторий приватный)
-if [ -n "${INPUT_GITHUB_TOKEN:-}" ]; then
+if [ -n "${MAUTIBOX_GITHUB_TOKEN :-}" ]; then
     echo "🔑 Using GitHub token for authentication..."
     # Добавляем ключ в агента SSH для HTTPS клонирования с токеном
     # Или клонируем по SSH, если настроен deploy key
-    GIT_CLONE_URL="https://${INPUT_GITHUB_TOKEN}@github.com/zaharovrd/language-packs.git"
+    GIT_CLONE_URL="https://${MAUTIBOX_GITHUB_TOKEN }@github.com/zaharovrd/language-packs.git"
 else
     echo "⚠️ No GitHub token provided, trying public access..."
     GIT_CLONE_URL="https://github.com/zaharovrd/language-packs.git"
