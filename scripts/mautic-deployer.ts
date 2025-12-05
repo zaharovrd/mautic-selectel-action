@@ -357,11 +357,11 @@ PORT=${this.config.port}
       }
 
       // Команда для выполнения внутри контейнера
-      // Языковые пакеты хранятся в директории /var/www/html/translations
+      // Языковые пакеты хранятся в директории /var/www/html/docroot/translations
       const commands = [
         'echo "Ensuring translations directory exists..."',
-        'mkdir -p /var/www/html/translations',
-        'cd /var/www/html/translations',
+        'mkdir -p /var/www/html/docroot/translations',
+        'cd /var/www/html/docroot/translations',
         'echo "Downloading language pack..."',
         curlCommand, // Добавляем уже сформированную команду curl
         'echo "Download complete. Unzipping..."',
