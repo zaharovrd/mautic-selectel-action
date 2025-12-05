@@ -359,6 +359,8 @@ PORT=${this.config.port}
       // Команда для выполнения внутри контейнера
       // Языковые пакеты хранятся в директории /var/www/html/translations
       const fullCommand = `
+        echo "Ensuring translations directory exists..." && \\
+        mkdir -p /var/www/html/translations && \\
         cd /var/www/html/translations && \\
         echo "Downloading language pack..." && \\
         ${curlCommand} && \\
@@ -371,8 +373,9 @@ PORT=${this.config.port}
         echo "Language pack installation finished."
       `;
 
+
       const result = await ProcessManager.runShell(
-        `docker exec mautic_web bash -c '${fullCommand}'`,
+        `docker exec mautic_web bash -c '${fullCommand.replace(/\n/g, '')}'`,
         { ignoreError: true }
       );
 
