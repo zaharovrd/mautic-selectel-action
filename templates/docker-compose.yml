@@ -6,6 +6,7 @@ x-mautic-volumes: &mautic-volumes
   - mautic_plugins:/var/www/html/docroot/plugins
   - mautic_themes:/var/www/html/docroot/themes
   - mautic_media:/var/www/html/docroot/media
+  - mautic_translations:/var/www/html/docroot/translations
   - ./logs:/var/www/html/var/logs
 
 services:
@@ -98,6 +99,7 @@ volumes:
   mautic_plugins:
   mautic_themes:
   mautic_media:
+  mautic_translations:
   mysql_data:
 
 
