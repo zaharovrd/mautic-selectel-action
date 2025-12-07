@@ -347,49 +347,54 @@ PORT=${this.config.port}
     Logger.log(`Installing language pack from: ${this.config.mauticLanguagePackUrl}`, '🌐');
 
     try {
-      // Подготавливаем команду curl, используя токен, если он есть
-      let curlCommand = '';
-      if (this.config.githubToken && this.config.mauticLanguagePackUrl.includes('github.com')) {
-        Logger.log('Using GitHub token for downloading language pack', '🔐');
-        curlCommand = `curl -L -o langpack.zip -H "Authorization: Bearer ${this.config.githubToken}" --connect-timeout 30 --max-time 120 "${this.config.mauticLanguagePackUrl}"`;
-      } else {
-        curlCommand = `curl -L -o langpack.zip --connect-timeout 30 --max-time 120 "${this.config.mauticLanguagePackUrl}"`;
-      }
+      // Используем -f, чтобы curl завершился с ошибкой (>0) при кодах 4xx/5xx
+      const curlCommand = `curl -fL -o langpack.zip --connect-timeout 30 --max-time 120 "${this.config.mauticLanguagePackUrl}"`;
 
-      // Команда для выполнения внутри контейнера
-      // Языковые пакеты хранятся в директории /var/www/html/docroot/translations
       const commands = [
-        'echo "Ensuring translations directory exists..."',
-        'mkdir -p /var/www/html/docroot/translations',
-        'cd /var/www/html/docroot/translations',
-        'echo "Downloading language pack..."',
-        curlCommand, // Добавляем уже сформированную команду curl
-        'echo "Download complete. Unzipping..."',
-        'unzip -o langpack.zip',
-        'echo "Unzip complete. Cleaning up..."',
+        'echo "--- STARTING LANGUAGE PACK INSTALLATION ---"',
+        'echo "Running as user: $(whoami)"',
+        'echo "STEP 1: Ensuring dependencies (curl, unzip)..."',
+        'apt-get update -y && apt-get install -yq curl unzip',
+        'echo "STEP 2: Creating directory structure..."',
+        'mkdir -p /var/www/html/translations && cd /var/www/html/translations',
+        'echo "Now in directory: $(pwd)"',
+        'echo "STEP 3: Downloading language pack..."',
+        curlCommand,
+        'echo "STEP 4: Verifying downloaded file..."',
+        'file langpack.zip', // Проверяем, что файл скачался и это ZIP-архив
+        'echo "STEP 5: Unzipping file..."',
+        'unzip -oq langpack.zip -d .',
+        'echo "STEP 6: Cleaning up..."',
         'rm langpack.zip',
-        'echo "Fixing permissions..."',
-        'chown -R www-data:www-data .',
-        'echo "Language pack installation finished."'
+        'echo "STEP 7: Fixing ownership for www-data user..."',
+        'chown -R www-data:www-data /var/www/html/translations',
+        'echo "STEP 8: Verifying final file list:"',
+        'ls -lA', // Финальная проверка - выводим список файлов
+        'echo "--- LANGUAGE PACK INSTALLATION FINISHED ---"'
       ];
+
       const fullCommand = commands.join(' && ');
 
+      // ЗАПУСКАЕМ ОТ ROOT! Это решает проблемы с правами для `apt-get`, `mkdir` и `chown`.
       const result = await ProcessManager.runShell(
-        `docker exec mautic_web bash -c "${fullCommand}"`,
+        `docker exec --user root mautic_web bash -c '${fullCommand}'`,
         { ignoreError: true }
       );
 
+      Logger.log("--- Language Pack Installation Output ---", "📋");
+      Logger.log(result.output, "📄");
+      Logger.log("--- End of Output ---", "📋");
+
       if (!result.success) {
-        throw new Error(`Failed to install language pack: ${result.output}`);
+        throw new Error(`Failed to install language pack. See output above for details.`);
       }
 
-      Logger.log(result.output, '📄');
       Logger.success(`Language pack for '${this.config.mauticLanguage}' installed successfully.`);
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Logger.error(`❌ Failed to install language pack: ${errorMessage}`);
-      throw error; // Прерываем установку, если язык важен
+      throw error;
     }
   }
 
