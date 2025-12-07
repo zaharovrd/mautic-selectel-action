@@ -313,10 +313,10 @@ MAUTIC_RUN_CRON_JOBS=true
 ${languageConfig}
 
 # Admin Configuration
-MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
-MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
-MAUTIC_ADMIN_FIRSTNAME=Admin
-MAUTIC_ADMIN_LASTNAME=User
+# MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
+# MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
+# MAUTIC_ADMIN_FIRSTNAME=Admin
+# MAUTIC_ADMIN_LASTNAME=User
 
 # Docker Configuration - will be overridden per container
 DOCKER_MAUTIC_ROLE=mautic_web
