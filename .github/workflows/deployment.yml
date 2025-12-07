@@ -5,35 +5,34 @@ on:
   workflow_dispatch:
     inputs:
       vps_name:
-        description: 'Уникальное имя сервера (например, client-name-mautic)'
+        description: "Уникальное имя сервера (например, client-name-mautic)"
         required: true
-        default: 'mautic-production'
+        default: "mautic-production"
       email:
-        description: 'Email администратора для Mautic'
+        description: "Email администратора для Mautic"
         required: true
-        default: 'admin@example.com'
+        default: "admin@example.com"
       domain:
-        description: 'Домен для Mautic (оставить пустым для IP-адреса)'
+        description: "Домен для Mautic (оставить пустым для IP-адреса)"
         required: false
       mautic_version:
-        description: 'Версия Docker-образа Mautic'
+        description: "Версия Docker-образа Mautic"
         required: true
-        default: '6.0.5-apache'
-        
+        default: "6.0.5-apache"
+
       plugins:
-        description: 'Список URL плагинов для установки (каждый с новой строки)'
+        description: "Список URL плагинов для установки (каждый с новой строки)"
         required: false
         type: string
-
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: Deploy Mautic to Selectel
         id: deploy
         uses: ./
@@ -42,20 +41,22 @@ jobs:
           selectel-token: ${{ secrets.SELECTEL_TOKEN }}
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           vps-name: ${{ github.event.inputs.vps_name }}
-          vps-rplan: 'medium'
-          vps-location: 'spb0'
+          vps-rplan: "medium"
+          vps-location: "spb0"
 
           # --- Параметры Mautic (из workflow inputs) ---
           email: ${{ github.event.inputs.email }}
           domain: ${{ github.event.inputs.domain }}
           mautic-version: ${{ github.event.inputs.mautic_version }}
+          language-pack-url: "https://github.com/zaharovrd/language-packs/raw/master/mautibox_ru.zip"
+          language-code: "ru"
 
           # --- Пароли из секретов ---
           mautic-password: ${{ secrets.MAUTIC_PASSWORD }}
           mysql-password: ${{ secrets.MYSQL_PASSWORD }}
           mysql-root-password: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           # --- Плагины ---
-          plugins: ${{ github.event.inputs.plugins }} 
+          plugins: ${{ github.event.inputs.plugins }}
 
       - name: Show deployment results
         run: |
