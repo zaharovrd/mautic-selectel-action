@@ -53,6 +53,7 @@ async function main() {
     // Load configuration
     Logger.log('Loading deployment configuration...', '📋');
     const config = await loadDeploymentConfig();
+    Logger.log(`Debug URL from config object: ${config.mauticLanguagePackUrl}`, '🔬');
     Logger.success('Configuration loaded and validated');
 
     // >>> НАЧАЛО НОВОГО БЛОКА ДИАГНОСТИКИ <<<

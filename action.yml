@@ -160,7 +160,9 @@ runs:
       id: deploy
       shell: bash
       # Указываем наш новый скрипт для Selectel
-      run: ${{ github.action_path }}/scripts/deploy_selectel.sh
+      run: |
+        echo "Debug URL from input: ${{ inputs.language-pack-url }}"
+        ${{ github.action_path }}/scripts/deploy_selectel.sh
       env:
         # Передаем все inputs как переменные окружения в скрипт
         INPUT_SELECTEL_TOKEN: ${{ inputs.selectel-token }}

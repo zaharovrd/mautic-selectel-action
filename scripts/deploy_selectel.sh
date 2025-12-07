@@ -16,6 +16,7 @@
 set -e
 
 echo "🚀 Starting deployment to Selectel..."
+echo "Debug URL from env var: $INPUT_LANGUAGE_PACK_URL"
 echo "Mautic version to deploy/update: ${INPUT_MAUTIC_VERSION}"
 SELECTEL_API_URL="https://api.vscale.io/v1"
 SELECTEL_TOKEN="${INPUT_SELECTEL_TOKEN}"
