@@ -19,6 +19,7 @@ export interface DeploymentConfig {
   mauticPlugins?: string;
   mauticLanguagePackUrl?: string;
   mauticLanguage?: string;
+  defaultTimezone: string;
   mysqlDatabase: string;
   mysqlUser: string;
   mysqlPassword: string;

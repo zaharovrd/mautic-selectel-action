@@ -293,13 +293,6 @@ export class MauticDeployer {
 
   private async createEnvironmentFile(): Promise<void> {
     Logger.log('Creating environment configuration...', '⚙️');
-
-    const languageConfig = this.config.mauticLanguage
-    const languageConfig = `MAUTIC_DEFAULT_LANGUAGE=${this.config.mauticLanguage || 'en_US'}`;
-    const timezoneConfig = `MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}`;
-
-
-
     const envContent = `
 # Database Configuration
 MAUTIC_DB_HOST=mysql
@@ -311,8 +304,8 @@ MAUTIC_DB_PORT=3306
 # Mautic Configuration
 MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
 MAUTIC_RUN_CRON_JOBS=true
-${languageConfig}
-${timezoneConfig}
+MAUTIC_DEFAULT_LANGUAGE=${this.config.mauticLanguage || 'en_US'}
+MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}
 
 # Admin Configuration
 # MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
