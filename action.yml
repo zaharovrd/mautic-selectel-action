@@ -44,6 +44,10 @@ inputs:
     description: "The language code to set as default during installation (e.g., ru, es)."
     required: false
     default: "ru"
+  default-timezone:
+    description: "Default timezone for Mautic installation (e.g., Europe/Moscow)."
+    required: false
+    default: "Europe/Moscow"
 
   # --- Конфигурация VPS ---
   domain:

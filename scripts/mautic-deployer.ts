@@ -295,8 +295,9 @@ export class MauticDeployer {
     Logger.log('Creating environment configuration...', '⚙️');
 
     const languageConfig = this.config.mauticLanguage
-      ? `MAUTIC_DEFAULT_LANGUAGE=${this.config.mauticLanguage}`
-      : '# MAUTIC_DEFAULT_LANGUAGE is not set';
+    const languageConfig = `MAUTIC_DEFAULT_LANGUAGE=${this.config.mauticLanguage || 'en_US'}`;
+    const timezoneConfig = `MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}`;
+
 
 
     const envContent = `
@@ -311,6 +312,7 @@ MAUTIC_DB_PORT=3306
 MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
 MAUTIC_RUN_CRON_JOBS=true
 ${languageConfig}
+${timezoneConfig}
 
 # Admin Configuration
 # MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
@@ -1148,9 +1150,12 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
       Logger.log(`Site URL: ${siteUrl}`, '🌐');
       Logger.log('Database: mautic_db', '🗄️');
       Logger.log(`Admin email: ${this.config.emailAddress}`, '👤');
+      // ✅ --- ДОБАВЛЕН БЛОК ЛОГИРОВАНИЯ И КОМАНДЫ --- ✅
+      Logger.log(`Default Language: ${this.config.mauticLanguage}`, '🗣️');
+      Logger.log(`Default Timezone: ${this.config.defaultTimezone}`, '🕒');
 
-      // Use timeout command to limit installation time
-      const installResult = await ProcessManager.run([
+      // Собираем команду установки
+      const installCommandParams = [
         'timeout', '300', // 5 minutes timeout
         'docker', 'exec',
         '--user', 'www-data',
@@ -1163,7 +1168,18 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         '--force',
         '--no-interaction',
         '-vvv'
-      ], { timeout: 320000 }); // ProcessManager timeout slightly longer than shell timeout
+      ];
+
+      // Динамически добавляем язык и часовой пояс, если они заданы
+      if (this.config.mauticLanguage) {
+        installCommandParams.push('--default_language=' + this.config.mauticLanguage);
+      }
+      if (this.config.defaultTimezone) {
+        installCommandParams.push('--default_timezone=' + this.config.defaultTimezone);
+      }
+
+      // Запускаем команду
+      const installResult = await ProcessManager.run(installCommandParams, { timeout: 320000 });
 
       if (installResult.success) {
         Logger.success('✅ Mautic installation completed successfully');
