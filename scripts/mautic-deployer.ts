@@ -272,6 +272,32 @@ export class MauticDeployer {
         Logger.log(schemaUpdateResult.output, '📄');
       }
 
+      if (this.config.mauticLanguage && this.config.mauticLanguage !== 'en_US') {
+        Logger.log(`Force setting default language to '${this.config.mauticLanguage}' in config/local.php...`, '🗣️');
+
+        const configFile = '/var/www/html/config/local.php';
+        // Команда sed ищет строку 'locale' => '...' и заменяет ее.
+        const sedCommand = `sed -i "s|'locale'\\s*=>\\s*[\\'\\"].*?[\\'\"]|'locale' => '${this.config.mauticLanguage}'|g" ${configFile}`;
+
+        const commandToRun = [
+          'docker', 'exec', '--user', 'www-data', 'mautic_web',
+          'bash', '-c',
+          sedCommand
+        ];
+
+        const sedResult = await ProcessManager.run(commandToRun, { ignoreError: true });
+
+        if (sedResult.success) {
+          Logger.success('Default language successfully updated in config/local.php.');
+          // Для проверки выведем измененную строку
+          const grepResult = await ProcessManager.runShell(`docker exec mautic_web grep "'locale'" ${configFile}`, { ignoreError: true });
+          Logger.log(`Verification: ${grepResult.output.trim()}`, '🔍');
+        } else {
+          Logger.error('Failed to update default language in config/local.php.');
+          Logger.log(sedResult.output, '📄');
+        }
+      }
+
       // Clear cache after installation
       await this.clearCache('after installation');
 
