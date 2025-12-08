@@ -255,6 +255,22 @@ export class MauticDeployer {
 
       // Run Mautic installation inside the container
       await this.runMauticInstallation();
+      Logger.log('Applying post-installation configurations...', '⚙️');
+      await this.clearCache('to apply language/timezone');
+
+      // 2. Обновляем схему БД, это может быть необходимо для некоторых версий
+      Logger.log('Updating database schema...', '🗄️');
+      const schemaUpdateResult = await ProcessManager.runShell(
+        `docker exec --user www-data mautic_web php /var/www/html/bin/console doctrine:schema:update --force`,
+        { ignoreError: true }
+      );
+      if (schemaUpdateResult.success) {
+        Logger.success('Database schema updated successfully.');
+        Logger.log(schemaUpdateResult.output, '📄');
+      } else {
+        Logger.warning('Database schema update failed (this may be normal if no changes are needed).');
+        Logger.log(schemaUpdateResult.output, '📄');
+      }
 
       // Clear cache after installation
       await this.clearCache('after installation');
@@ -1147,8 +1163,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
       Logger.log(`Default Language: ${this.config.mauticLanguage}`, '🗣️');
       Logger.log(`Default Timezone: ${this.config.defaultTimezone}`, '🕒');
 
-      // Собираем команду установки
-      const installCommandParams = [
+      const installResult = await ProcessManager.run([
         'timeout', '300', // 5 minutes timeout
         'docker', 'exec',
         '--user', 'www-data',
@@ -1161,18 +1176,8 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         '--force',
         '--no-interaction',
         '-vvv'
-      ];
+      ], { timeout: 320000 }); // ProcessManager timeout slightly longer than shell timeout
 
-      // Динамически добавляем язык и часовой пояс, если они заданы
-      if (this.config.mauticLanguage) {
-        installCommandParams.push('--default_language=' + this.config.mauticLanguage);
-      }
-      if (this.config.defaultTimezone) {
-        installCommandParams.push('--default_timezone=' + this.config.defaultTimezone);
-      }
-
-      // Запускаем команду
-      const installResult = await ProcessManager.run(installCommandParams, { timeout: 320000 });
 
       if (installResult.success) {
         Logger.success('✅ Mautic installation completed successfully');
