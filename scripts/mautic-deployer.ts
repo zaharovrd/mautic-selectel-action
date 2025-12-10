@@ -245,7 +245,7 @@ export class MauticDeployer {
       await DockerManager.waitForHealthy('mautic_web', 300);
 
       // Install custom language pack if specified
-      if (this.config.mauticLanguagePackUrl && this.config.mauticLanguage) {
+      if (this.config.mauticLanguagePackUrl && this.config.mauticLocale) {
         Logger.log('=== STARTING LANGUAGE PACK INSTALLATION ===', '🌐');
         await this.installLanguagePack();
         Logger.log('=== LANGUAGE PACK INSTALLATION COMPLETED ===', '🌐');
@@ -305,7 +305,7 @@ MAUTIC_DB_PORT=3306
 # Mautic Configuration
 MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
 MAUTIC_RUN_CRON_JOBS=true
-MAUTIC_LANGUAGE=${this.config.mauticLanguage || 'en_US'}
+MAUTIC_LOCALE=${this.config.mauticLocale || 'en_US'}
 MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}
 
 # Admin Configuration
@@ -385,7 +385,7 @@ PORT=${this.config.port}
         throw new Error(`Failed to install language pack. See output above for details.`);
       }
 
-      Logger.success(`Language pack for '${this.config.mauticLanguage}' installed successfully.`);
+      Logger.success(`Language pack for '${this.config.mauticLocale}' installed successfully.`);
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1145,7 +1145,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
       Logger.log('Database: mautic_db', '🗄️');
       Logger.log(`Admin email: ${this.config.emailAddress}`, '👤');
       // ✅ --- ДОБАВЛЕН БЛОК ЛОГИРОВАНИЯ И КОМАНДЫ --- ✅
-      Logger.log(`Default Language: ${this.config.mauticLanguage}`, '🗣️');
+      Logger.log(`Default Language: ${this.config.mauticLocale}`, '🗣️');
       Logger.log(`Default Timezone: ${this.config.defaultTimezone}`, '🕒');
 
       const installResult = await ProcessManager.run([

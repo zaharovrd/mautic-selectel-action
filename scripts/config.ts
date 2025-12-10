@@ -41,7 +41,7 @@ export async function loadDeploymentConfig(): Promise<DeploymentConfig> {
       mauticThemes: config.MAUTIC_THEMES,
       mauticPlugins: config.MAUTIC_PLUGINS,
       mauticLanguagePackUrl: config.MAUTIC_LANGUAGE_PACK_URL,
-      mauticLanguage: config.MAUTIC_LANGUAGE,
+      mauticLocale: config.MAUTIC_LOCALE,
       defaultTimezone: config.DEFAULT_TIMEZONE || 'UTC',
       mysqlDatabase: config.MYSQL_DATABASE,
       mysqlUser: config.MYSQL_USER,
