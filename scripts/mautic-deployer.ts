@@ -255,51 +255,10 @@ export class MauticDeployer {
 
       // Run Mautic installation inside the container
       await this.runMauticInstallation();
-      Logger.log('Applying post-installation configurations...', '⚙️');
-      await this.clearCache('to apply language/timezone');
 
-      // 2. Обновляем схему БД, это может быть необходимо для некоторых версий
-      Logger.log('Updating database schema...', '🗄️');
-      const schemaUpdateResult = await ProcessManager.runShell(
-        `docker exec --user www-data mautic_web php /var/www/html/bin/console doctrine:schema:update --force`,
-        { ignoreError: true }
-      );
-      if (schemaUpdateResult.success) {
-        Logger.success('Database schema updated successfully.');
-        Logger.log(schemaUpdateResult.output, '📄');
-      } else {
-        Logger.warning('Database schema update failed (this may be normal if no changes are needed).');
-        Logger.log(schemaUpdateResult.output, '📄');
-      }
-
-      if (this.config.mauticLanguage && this.config.mauticLanguage !== 'en_US') {
-        Logger.log(`Force setting default language to '${this.config.mauticLanguage}' in config/local.php...`, '🗣️');
-
-        const configFile = '/var/www/html/config/local.php';
-        // Команда sed ищет строку 'locale' => '...' и заменяет ее.
-        const sedCommand = `sed -i "s|'locale'\\s*=>\\s*[\\'\\"].*?[\\'\"]|'locale' => '${this.config.mauticLanguage}'|g" ${configFile}`;
-
-        const commandToRun = [
-          'docker', 'exec', '--user', 'www-data', 'mautic_web',
-          'bash', '-c',
-          sedCommand
-        ];
-
-        const sedResult = await ProcessManager.run(commandToRun, { ignoreError: true });
-
-        if (sedResult.success) {
-          Logger.success('Default language successfully updated in config/local.php.');
-          // Для проверки выведем измененную строку
-          const grepResult = await ProcessManager.runShell(`docker exec mautic_web grep "'locale'" ${configFile}`, { ignoreError: true });
-          Logger.log(`Verification: ${grepResult.output.trim()}`, '🔍');
-        } else {
-          Logger.error('Failed to update default language in config/local.php.');
-          Logger.log(sedResult.output, '📄');
-        }
-      }
-
-      // Clear cache after installation
-      await this.clearCache('after installation');
+      // Очищаем кеш, чтобы Mautic подхватил все переменные окружения из .mautic_env
+      Logger.log('Applying environment configurations by clearing cache...', '⚙️');
+      await this.clearCache('to apply environment settings');
 
       // Fix media .htaccess files if they have incorrect configuration
       await this.fixMediaHtaccess();
@@ -346,7 +305,7 @@ MAUTIC_DB_PORT=3306
 # Mautic Configuration
 MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
 MAUTIC_RUN_CRON_JOBS=true
-MAUTIC_DEFAULT_LANGUAGE=${this.config.mauticLanguage || 'en_US'}
+MAUTIC_LANGUAGE=${this.config.mauticLanguage || 'en_US'}
 MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}
 
 # Admin Configuration
