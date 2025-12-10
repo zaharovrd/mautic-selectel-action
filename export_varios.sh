@@ -23,7 +23,7 @@ export INPUT_MYSQL_USER="mautic_user"
 
 # Языковой пакет
 export INPUT_LANGUAGE_PACK_URL="https://github.com/zaharovrd/language-packs/raw/master/mautibox_ru.zip"
-export INPUT_LANGUAGE_CODE="ru"
+export INPUT_LOCALE="ru"
 
 
 # Очень важная переменная, указывающая на корень проекта

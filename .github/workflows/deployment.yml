@@ -49,7 +49,7 @@ jobs:
           domain: ${{ github.event.inputs.domain }}
           mautic-version: ${{ github.event.inputs.mautic_version }}
           language-pack-url: "https://github.com/zaharovrd/language-packs/raw/master/mautibox_ru.zip"
-          language-code: "ru"
+          locale: "ru"
 
           # --- Пароли из секретов ---
           mautic-password: ${{ secrets.MAUTIC_PASSWORD }}

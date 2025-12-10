@@ -40,7 +40,7 @@ inputs:
     description: "URL to the language pack ZIP file (e.g., from a GitHub release)."
     required: false
     default: "https://github.com/zaharovrd/language-packs/raw/master/mautibox_ru.zip"
-  language-code:
+  locale:
     description: "The language code to set as default during installation (e.g., ru, es)."
     required: false
     default: "ru"
@@ -177,7 +177,7 @@ runs:
         INPUT_MAUTIC_VERSION: ${{ inputs.mautic-version }}
         INPUT_MAUTIC_PORT: ${{ inputs.mautic-port }}
         INPUT_LANGUAGE_PACK_URL: ${{ inputs.language-pack-url }}
-        INPUT_LANGUAGE_CODE: ${{ inputs.language-code }}
+        INPUT_LOCALE: ${{ inputs.locale }}
         INPUT_DOMAIN: ${{ inputs.domain }}
         INPUT_VPS_NAME: ${{ inputs.vps-name }}
         INPUT_VPS_RPLAN: ${{ inputs.vps-rplan }}
