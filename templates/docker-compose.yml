@@ -42,7 +42,7 @@ services:
       - .mautic_env
     environment:
       - DOCKER_MAUTIC_ROLE=mautic_web
-      - DOCKER_MAUTIC_LOAD_TEST_DATA=false
+      - DOCKER_MAUTIC_LOAD_TEST_DATA=true # with demodata - password is Maut1cR0cks!
       - DOCKER_MAUTIC_RUN_MIGRATIONS=true
     volumes: *mautic-volumes
     restart: unless-stopped
@@ -57,7 +57,7 @@ services:
 
   # Mautic cron jobs
   mautic_cron:
-    image: mautic/mautic:${MAUTIC_VERSION:-6.0.5-apache}
+    image: mautic/mautic:${MAUTIC_VERSION:-6.0.7-apache}
     container_name: mautic_cron
     depends_on:
       mautic:
