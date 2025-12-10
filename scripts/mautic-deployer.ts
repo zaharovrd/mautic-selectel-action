@@ -308,11 +308,11 @@ MAUTIC_RUN_CRON_JOBS=true
 MAUTIC_LOCALE=${this.config.mauticLocale || 'en_US'}
 MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}
 
-Admin Configuration
-MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
-MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
-MAUTIC_ADMIN_FIRSTNAME=Admin
-MAUTIC_ADMIN_LASTNAME=User
+# Admin Configuration
+# MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
+# MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
+# MAUTIC_ADMIN_FIRSTNAME=Admin
+# MAUTIC_ADMIN_LASTNAME=User
 
 # Docker Configuration - will be overridden per container
 DOCKER_MAUTIC_ROLE=mautic_web
