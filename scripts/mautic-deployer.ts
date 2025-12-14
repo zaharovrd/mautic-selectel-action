@@ -133,6 +133,11 @@ export class MauticDeployer {
       // Clear cache after update
       await this.clearCache('after update');
 
+      // Применяем White-Label кастомизацию после обновления
+      await this.applyWhiteLabeling();
+      // Очищаем кэш снова, чтобы применить изменения в шаблонах
+      await this.clearCache('after applying white-labeling post-update');
+
       Logger.success('Mautic update completed successfully');
       return true;
 
@@ -140,6 +145,74 @@ export class MauticDeployer {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Logger.error(`Update failed: ${errorMessage}`);
       return false;
+    }
+  }
+
+  /**
+   * Применяет кастомизацию white-label: заменяет логотипы и добавляет CSS.
+   */
+  private async applyWhiteLabeling(): Promise<void> {
+    Logger.log('🎨 Применение White-Label кастомизации...', '🎨');
+    try {
+      // 1. Замена логотипа в шапке (Header logo)
+      const navbarPath = '/var/www/html/docroot/app/bundles/CoreBundle/Resources/views/Default/navbar.html.twig';
+      const newHeaderLogoUrl = 'https://mautibox.ru/Sidebar%20Logo_130px.png';
+      const headerSedCommand = `sed -i "s|asset('bundles/core/images/mautic_logo_white.png')|'${newHeaderLogoUrl}'|" ${navbarPath}`;
+
+      await ProcessManager.runShell(`docker exec mautic_web bash -c "${headerSedCommand}"`);
+      Logger.log('✅ Логотип в шапке заменен.', '🎨');
+
+      // 2. Замена логотипа на странице входа (Main logo)
+      const loginPath = '/var/www/html/docroot/app/bundles/UserBundle/Resources/views/Security/base.html.twig';
+      const newLoginLogoUrl = 'https://mautibox.ru/Login_Logo_150px.png';
+      // Заменяем весь блок с изображением для большей надежности
+      const loginSedCommand = `sed -i 's|<img.*mautic_logo_login.*>|<img src=\\"${newLoginLogoUrl}\\" class=\\"img-responsive center-block\\" style=\\"max-width: 150px;\\" />|g' ${loginPath}`;
+
+      await ProcessManager.runShell(`docker exec mautic_web bash -c "${loginSedCommand}"`);
+      Logger.log('✅ Логотип на странице входа заменен.', '🎨');
+
+      // 3. Добавление кастомного CSS
+      const headPath = '/var/www/html/docroot/app/bundles/CoreBundle/Resources/views/Default/head.html.twig';
+      const customCssBlock = `
+        <style>
+            /* ----- Custom MautiBox Styles ----- */
+            /* Скрываем ссылки на официальные ресурсы Mautic в боковом меню */
+            #aside a[href*="mautic.org"],
+            #aside a[href$="/s/help"] {
+                display: none !important;
+            }
+            /* Пример: меняем основной цвет кнопок */
+            .btn-primary {
+                background-color: #5544B0 !important; /* Фирменный фиолетовый */
+                border-color: #413486 !important;
+            }
+            .btn-primary:hover {
+                background-color: #413486 !important;
+                border-color: #2c245a !important;
+            }
+            /* ----- End Custom Styles ----- */
+        </style>
+      `;
+
+      // Используем сложную команду `sed` для вставки многострочного блока перед </head>
+      // Сначала создаем временный файл с CSS, затем вставляем его содержимое
+      const cssInjectCommand = `
+        cat <<'CSS_EOF' > /tmp/custom-styles.html
+${customCssBlock}
+CSS_EOF
+        sed -i -e '/<\\/head>/r /tmp/custom-styles.html' ${headPath}
+        rm /tmp/custom-styles.html
+      `;
+
+      await ProcessManager.runShell(`docker exec mautic_web bash -c "${cssInjectCommand.replace(/"/g, '\\"')}"`);
+      Logger.log('✅ Кастомные CSS стили добавлены.', '🎨');
+
+      Logger.success('✅ White-Label кастомизация успешно применена.');
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Logger.error(`⚠️ Ошибка во время применения White-Label кастомизации: ${errorMessage}`);
+      // Не прерываем выполнение, т.к. это не критичная ошибка
     }
   }
 
@@ -281,6 +354,11 @@ export class MauticDeployer {
       } else {
         Logger.log('No themes or plugins configured for installation', 'ℹ️');
       }
+
+      // Применяем White-Label кастомизацию
+      await this.applyWhiteLabeling();
+      // Очищаем кэш после кастомизации для применения изменений
+      await this.clearCache('after applying white-labeling');
 
       Logger.success('Mautic installation completed successfully');
       return true;
