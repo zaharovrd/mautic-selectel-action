@@ -18,6 +18,15 @@ inputs:
   github-token:
     description: "GitHub Personal Access Token (PAT) for accessing private repositories for themes, plugins, and language packs."
     required: false
+  base-domain:
+    description: "Your base domain delegated to Selectel DNS (e.g., mautibox.ru)"
+    required: false
+  client-email:
+    description: "Email for the non-admin client user. If empty, user is not created."
+    required: false
+  client-mautic-password:
+    description: "Password for the non-admin client user."
+    required: false
 
   # --- Конфигурация Mautic ---
   email:
@@ -173,11 +182,14 @@ runs:
         INPUT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         INPUT_EMAIL: ${{ inputs.email }}
+        INPUT_CLIENT_EMAIL: ${{ inputs.client-email }}
+        INPUT_CLIENT_MAUTIC_PASSWORD: ${{ inputs.client-mautic-password }}
         INPUT_MAUTIC_PASSWORD: ${{ inputs.mautic-password }}
         INPUT_MAUTIC_VERSION: ${{ inputs.mautic-version }}
         INPUT_MAUTIC_PORT: ${{ inputs.mautic-port }}
         INPUT_LANGUAGE_PACK_URL: ${{ inputs.language-pack-url }}
         INPUT_LOCALE: ${{ inputs.locale }}
+        INPUT_BASE_DOMAIN: ${{ inputs.base-domain }}
         INPUT_DOMAIN: ${{ inputs.domain }}
         INPUT_VPS_NAME: ${{ inputs.vps-name }}
         INPUT_VPS_RPLAN: ${{ inputs.vps-rplan }}

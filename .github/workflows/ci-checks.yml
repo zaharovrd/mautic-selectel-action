@@ -3,56 +3,51 @@ name: CI Checks
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
-      - name: Test action syntax
+
+      - name: Test action syntax and file structure
         run: |
           # Validate action.yml syntax
           cat action.yml
-          
-          # Check required files exist
+
+          # Check required files exist for the universal architecture
           test -f scripts/deploy_selectel.sh
           test -f scripts/setup-vps.sh
+          test -f scripts/configure.sh
           test -f scripts/setup.ts
           test -f templates/docker-compose.yml
-          test -f templates/.env.template
-          test -f templates/.mautic_env
+          test -f templates/env.template
+          test -f templates/.mautic_env.template
           test -f templates/nginx-virtual-host-template
-          
+
           echo "✅ All required files exist"
-          
+
       - name: Validate shell scripts
         run: |
           # Check shell script syntax
           bash -n scripts/deploy_selectel.sh
           bash -n scripts/setup-vps.sh
-          
+          bash -n scripts/configure.sh
+
           echo "✅ Shell scripts are valid"
-          
+
       - name: Validate TypeScript
         run: |
           # Install Deno for TypeScript validation
           curl -fsSL https://deno.land/install.sh | sh
           export PATH="$HOME/.deno/bin:$PATH"
-          
+
           # Check TypeScript syntax
           deno check scripts/setup.ts
-          
+
           echo "✅ TypeScript files are valid"
-          
-      - name: Check file permissions
-        run: |
-          # Ensure scripts are executable
-          chmod +x scripts/*.sh
-          
-          echo "✅ Script permissions set"

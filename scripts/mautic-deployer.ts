@@ -237,6 +237,44 @@ CSS_EOF
     }
   }
 
+  private async createClientUser(): Promise<void> {
+    const clientEmail = this.config.clientEmail;
+    const clientPassword = this.config.clientMauticPassword;
+
+    if (!clientEmail || !clientPassword) {
+      Logger.log('ℹ️ Client user creation skipped (email or password not provided).', 'ℹ️');
+      return;
+    }
+
+    Logger.log(`👤 Creating non-admin user for ${clientEmail}...`, '👤');
+    try {
+      const createUserCommand = [
+        'php', './bin/console', 'mautic:users:create',
+        '--firstname="Client"',
+        '--lastname="User"',
+        `--email="${clientEmail}"`,
+        `--username="${clientEmail}"`,
+        '--role=2', // ID стандартной роли "User"
+        `--password="${clientPassword}"`,
+        '--no-interaction'
+      ].join(' ');
+
+      const result = await ProcessManager.runShell(
+        `docker exec --user www-data --workdir /var/www/html mautibox_web ${createUserCommand}`
+      );
+
+      if (result.success && result.output.includes('New user ID')) {
+        Logger.success(`✅ Client user ${clientEmail} created successfully.`);
+      } else {
+        throw new Error(result.output || 'Failed to create user.');
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Logger.error(`❌ Failed to create client user: ${errorMessage}`);
+    }
+  }
+
+
   async performInstallation(): Promise<boolean> {
     Logger.log('Performing fresh Mautic installation...', '🚀');
 
@@ -359,6 +397,9 @@ CSS_EOF
       await this.applyWhiteLabeling();
       // Очищаем кэш после кастомизации для применения изменений
       await this.clearCache('after applying white-labeling');
+
+      // Создаем пользователя для клиента
+      await this.createClientUser();
 
       Logger.success('Mautic installation completed successfully');
       return true;

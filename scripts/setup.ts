@@ -50,6 +50,15 @@ async function main() {
     Logger.log(`  - Swap status: ${swapInfo.output || 'No swap active'}`);
 
     Logger.log('Setting up memory-conservative environment for installation...', '💾');
+
+    // Запуск скрипта конфигурации для локальной установки
+    Logger.log('Running pre-configuration script...', '🔧');
+    const configureResult = await ProcessManager.runShell('./configure.sh');
+    if (!configureResult.success) {
+      throw new Error(`Configuration script failed: ${configureResult.output}`);
+    }
+    Logger.success('Pre-configuration complete.');
+
     // Load configuration
     Logger.log('Loading deployment configuration...', '📋');
     const config = await loadDeploymentConfig();

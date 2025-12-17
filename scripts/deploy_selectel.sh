@@ -105,6 +105,77 @@ while [ -z "$VPS_IP" ]; do
     COUNTER=$((COUNTER + 10))
 done
 
+# --- ШАГ 1: УПРАВЛЕНИЕ DNS И ПРОВЕРКА ---
+if [ -n "$INPUT_DOMAIN" ] && [ -n "$INPUT_BASE_DOMAIN" ]; then
+    echo "🌐 Managing DNS for domain ${INPUT_DOMAIN} via base domain ${INPUT_BASE_DOMAIN}..."
+    
+    echo "🔍 Finding Domain ID for base domain '${INPUT_BASE_DOMAIN}'..."
+    DOMAINS_JSON=$(curl -s $CURL_OPTIONS -X GET "${SELECTEL_API_URL}/domains/" -H "X-Token: ${SELECTEL_TOKEN}")
+    DOMAIN_ID=$(echo "${DOMAINS_JSON}" | jq -r --arg name "${INPUT_BASE_DOMAIN}" '.[] | select(.name == $name) | .id')
+
+    if [ -z "$DOMAIN_ID" ] || [ "$DOMAIN_ID" == "null" ]; then
+        echo "❌ CRITICAL: Base domain '${INPUT_BASE_DOMAIN}' not found in your Selectel account or is not delegated to Selectel DNS."
+        exit 1
+    fi
+    echo "✅ Found Domain ID: ${DOMAIN_ID}"
+
+    echo "🔍 Checking for existing A-record for '${INPUT_DOMAIN}'..."
+    RECORDS_JSON=$(curl -s $CURL_OPTIONS -X GET "${SELECTEL_API_URL}/domains/${DOMAIN_ID}/records/" -H "X-Token: ${SELECTEL_TOKEN}")
+    EXISTING_RECORD=$(echo "${RECORDS_JSON}" | jq -c --arg name "${INPUT_DOMAIN}" '.[] | select(.type == "A" and .name == $name)')
+
+    if [ -n "$EXISTING_RECORD" ] && [ "$EXISTING_RECORD" != "null" ]; then
+        EXISTING_IP=$(echo "$EXISTING_RECORD" | jq -r '.content')
+        RECORD_ID=$(echo "$EXISTING_RECORD" | jq -r '.id')
+        echo "✅ Found existing A-record (ID: ${RECORD_ID}) pointing to ${EXISTING_IP}"
+        
+        if [ "$EXISTING_IP" != "$VPS_IP" ]; then
+            echo "🔄 IP address has changed. Updating record..."
+            UPDATE_PAYLOAD=$(jq -n --arg name "$INPUT_DOMAIN" --arg type "A" --arg content "$VPS_IP" --argjson ttl 300 '{name: $name, type: $type, content: $content, ttl: $ttl}')
+            curl -s $CURL_OPTIONS -X PUT "${SELECTEL_API_URL}/domains/${DOMAIN_ID}/records/${RECORD_ID}" -H "X-Token: ${SELECTEL_TOKEN}" -H "Content-Type: application/json" -d "${UPDATE_PAYLOAD}" > /dev/null
+            echo "✅ A-record updated to point to ${VPS_IP}"
+        else
+            echo "👍 IP address is already correct."
+        fi
+    else
+        echo "📦 No existing A-record found. Creating new one..."
+        CREATE_PAYLOAD=$(jq -n --arg name "$INPUT_DOMAIN" --arg type "A" --arg content "$VPS_IP" --argjson ttl 300 '{name: $name, type: $type, content: $content, ttl: $ttl}')
+        curl -s $CURL_OPTIONS -X POST "${SELECTEL_API_URL}/domains/${DOMAIN_ID}/records/" -H "X-Token: ${SELECTEL_TOKEN}" -H "Content-Type: application/json" -d "${CREATE_PAYLOAD}" > /dev/null
+        echo "✅ New A-record created for '${INPUT_DOMAIN}' pointing to ${VPS_IP}"
+    fi
+    
+    echo "🌐 Waiting for DNS propagation for ${INPUT_DOMAIN}..."
+    TIMEOUT=300; COUNTER=0
+    while true; do
+        if [ $COUNTER -ge $TIMEOUT ]; then echo "❌ Timeout waiting for DNS propagation."; exit 1; fi
+        VERIFY_IP=$(dig +short "$INPUT_DOMAIN" @8.8.8.8)
+        if [ "$VERIFY_IP" == "$VPS_IP" ]; then
+            echo "✅ DNS record is live and points correctly to ${VPS_IP}!"
+            break
+        fi
+        echo "⏳ Waiting for DNS... (current IP: ${VERIFY_IP:-'not found'})"
+        sleep 15
+        COUNTER=$((COUNTER + 15))
+    done
+# Если домен передан, но без базового домена (ручная настройка)
+elif [ -n "$INPUT_DOMAIN" ]; then
+    echo "🌐 Verifying domain (manual DNS setup)..."
+    DOMAIN_IP=$(dig +short "$INPUT_DOMAIN")
+    if [ "$DOMAIN_IP" != "$VPS_IP" ]; then 
+        echo "❌ Domain $INPUT_DOMAIN does not point to $VPS_IP. Please update your DNS records manually and re-run."
+        exit 1
+    fi
+    echo "✅ Domain correctly points to VPS"
+fi
+
+# --- ШАГ 2: ПОДГОТОВКА NGINX (ЕСЛИ ЕСТЬ ДОМЕН) ---
+if [ -n "$INPUT_DOMAIN" ]; then
+    echo "🔧 Preparing nginx configuration for ${INPUT_DOMAIN}..."
+    cp "${ACTION_PATH}/templates/nginx-virtual-host-template" "nginx-virtual-host-${INPUT_DOMAIN}"
+    sed -i "s/DOMAIN_NAME/${INPUT_DOMAIN}/g" "nginx-virtual-host-${INPUT_DOMAIN}"
+    sed -i "s/PORT/${MAUTIC_PORT}/g" "nginx-virtual-host-${INPUT_DOMAIN}"
+    echo "✅ Nginx config prepared."
+fi
+
 if [ "$IS_UPDATE" == "false" ]; then
 echo "🔧 Running initial server setup for a new server..."
 echo "🔐 Waiting for SSH key-based authentication to be ready..."
@@ -127,18 +198,6 @@ else
 fi
 
 
-if [ -n "$INPUT_DOMAIN" ]; then
-    echo "🌐 Verifying domain..."
-    DOMAIN_IP=$(dig +short "$INPUT_DOMAIN")
-    if [ "$DOMAIN_IP" != "$VPS_IP" ]; then echo "❌ Domain $INPUT_DOMAIN does not point to $VPS_IP"; exit 1; fi
-    echo "✅ Domain correctly points to VPS"
-fi
-if [ -n "$INPUT_DOMAIN" ]; then
-    echo "🔧 Preparing nginx..."
-    cp "${ACTION_PATH}/templates/nginx-virtual-host-template" "nginx-virtual-host-${INPUT_DOMAIN}"
-    sed -i "s/DOMAIN_NAME/${INPUT_DOMAIN}/g" "nginx-virtual-host-${INPUT_DOMAIN}"
-    sed -i "s/PORT/${MAUTIC_PORT}/g" "nginx-virtual-host-${INPUT_DOMAIN}"
-fi
 echo "📋 Creating deployment config..."
 cat > deploy.env << EOF
 EMAIL_ADDRESS=${INPUT_EMAIL}

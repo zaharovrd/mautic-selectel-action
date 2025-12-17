@@ -1,28 +1,39 @@
-# .github/workflows/deployment.yml
 name: Deploy or Update MautiBox to Selectel
 
 on:
   workflow_dispatch:
     inputs:
+      # --- Клиентская информация ---
       vps_name:
-        description: "Уникальное имя сервера (например, client-name)"
+        description: "Имя клиента/проекта (латиницей, без пробелов, например 'myclient')"
         required: true
-        default: "mautibox-server"
-      email:
-        description: "Email администратора для MautiBox"
+        default: "mautibox-test"
+      client_email:
+        description: "Email клиента (будет логином для входа в MautiBox)"
         required: true
-        default: "admin@example.com"
-      domain:
-        description: "Домен для MautiBox (оставить пустым для IP-адреса)"
-        required: false
+        default: "client@example.com"
+
+      # --- Информация о домене ---
+      base_domain:
+        description: "Ваш основной домен на Selectel DNS (например, 'mautibox.ru')"
+        required: true
+        default: "mautibox.ru"
+
+      # --- Настройки MautiBox ---
       mautic_version:
-        description: "Версия Docker-образа Mautic"
+        description: "Версия Docker-образа MautiBox"
         required: true
         default: "6.0.7-apache"
       plugins:
-        description: "Список URL плагинов для установки (каждый с новой строки)"
+        description: "Плагины для установки (URL каждого с новой строки)"
         required: false
         type: string
+
+      # --- Информация об администраторе (для восстановления и SSL) ---
+      admin_email:
+        description: "Email администратора системы (для SSL и уведомлений)"
+        required: true
+        default: "z@mautibox.ru"
 
 jobs:
   deploy:
@@ -36,29 +47,43 @@ jobs:
         id: deploy
         uses: ./
         with:
-          # --- Параметры для Selectel ---
+          # --- Параметры аутентификации ---
           selectel-token: ${{ secrets.SELECTEL_TOKEN }}
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }} # Для приватных плагинов/тем
+
+          # --- Параметры VPS ---
           vps-name: ${{ github.event.inputs.vps_name }}
           vps-rplan: "medium"
           vps-location: "spb0"
 
-          # --- Параметры MautiBox (из workflow inputs) ---
-          email: ${{ github.event.inputs.email }}
-          domain: ${{ github.event.inputs.domain }}
+          # --- Параметры Домена (динамическое формирование) ---
+          # Склеиваем имя клиента и базовый домен, чтобы получить FQDN
+          domain: ${{ format('{0}.{1}', github.event.inputs.vps_name, github.event.inputs.base_domain) }}
+          base-domain: ${{ github.event.inputs.base_domain }}
+
+          # --- Параметры установки MautiBox ---
           mautic-version: ${{ github.event.inputs.mautic_version }}
           language-pack-url: "https://github.com/zaharovrd/language-packs/raw/master/mautibox_ru.zip"
           locale: "ru"
 
-          # --- Пароли из секретов ---
-          mautic-password: ${{ secrets.MAUTIC_PASSWORD }}
+          # --- Пользовательские данные ---
+          email: ${{ github.event.inputs.admin_email }} # Email администратора
+          client-email: ${{ github.event.inputs.client_email }} # Email пользователя-клиента
+
+          # --- Пароли из секретов GitHub ---
+          mautic-password: ${{ secrets.MAUTIC_ADMIN_PASSWORD }} # Пароль для системного администратора
+          client-mautic-password: ${{ secrets.CLIENT_MAUTIC_PASSWORD }} # Пароль для пользователя-клиента
           mysql-password: ${{ secrets.MYSQL_PASSWORD }}
           mysql-root-password: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          # --- Плагины ---
+
+          # --- Плагины и Темы ---
           plugins: ${{ github.event.inputs.plugins }}
+          # themes: "" # Можно добавить инпут для тем, если нужно
 
       - name: Show deployment results
+        if: always() # Этот шаг выполнится даже если деплой упадет
         run: |
-          echo "🎉 Deployment/Update completed!"
-          echo "VPS IP: ${{ steps.deploy.outputs.vps-ip }}"
-          echo "MautiBox URL: ${{ steps.deploy.outputs.mautic-url }}"
+          echo "🎉 Deployment/Update process finished!"
+          echo "➡️ VPS IP: ${{ steps.deploy.outputs.vps-ip }}"
+          echo "➡️ MautiBox URL: ${{ steps.deploy.outputs.mautic-url }}"
