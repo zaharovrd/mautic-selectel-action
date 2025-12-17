@@ -32,7 +32,7 @@ inputs:
   email:
     description: "Admin email address for Mautic and SSL certificates"
     required: true
-  mautic-password:
+  mautic-admin-password:
     description: "Admin password for Mautic"
     required: true
   mautic-version:
@@ -155,9 +155,10 @@ runs:
           echo "❌ Error: email is required"
           exit 1
         fi
-        if [ -z "${{ inputs.mautic-password }}" ]; then
-          echo "❌ Error: mautic-password is required"
+        if [ -z "${{ inputs.mautic-admin-password }}" ]; then
+          echo "❌ Error: mautic-admin-password is required"
           exit 1
+        fi
         fi
         if [ -z "${{ inputs.mysql-password }}" ]; then
           echo "❌ Error: mysql-password is required"
@@ -184,7 +185,7 @@ runs:
         INPUT_EMAIL: ${{ inputs.email }}
         INPUT_CLIENT_EMAIL: ${{ inputs.client-email }}
         INPUT_CLIENT_MAUTIC_PASSWORD: ${{ inputs.client-mautic-password }}
-        INPUT_MAUTIC_PASSWORD: ${{ inputs.mautic-password }}
+        INPUT_MAUTIC_ADMIN_PASSWORD: ${{ inputs.mautic-admin-password }}
         INPUT_MAUTIC_VERSION: ${{ inputs.mautic-version }}
         INPUT_MAUTIC_PORT: ${{ inputs.mautic-port }}
         INPUT_LANGUAGE_PACK_URL: ${{ inputs.language-pack-url }}

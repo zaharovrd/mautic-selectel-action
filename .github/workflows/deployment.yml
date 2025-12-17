@@ -72,7 +72,7 @@ jobs:
           client-email: ${{ github.event.inputs.client_email }} # Email пользователя-клиента
 
           # --- Пароли из секретов GitHub ---
-          mautic-password: ${{ secrets.MAUTIC_ADMIN_PASSWORD }} # Пароль для системного администратора
+          mautic-admin-password: ${{ secrets.MAUTIC_ADMIN_PASSWORD }} # Пароль для системного администратора
           client-mautic-password: ${{ secrets.CLIENT_MAUTIC_PASSWORD }} # Пароль для пользователя-клиента
           mysql-password: ${{ secrets.MYSQL_PASSWORD }}
           mysql-root-password: ${{ secrets.MYSQL_ROOT_PASSWORD }}
