@@ -40,40 +40,37 @@ export async function loadDeploymentConfig(): Promise<DeploymentConfig> {
       }
     }
 
-    // Возвращаем полный объект DeploymentConfig, исправляя ошибки
-    return {
-      // ИСПРАВЛЕНИЕ TS4111: Используем доступ через квадратные скобки ['...']
-      // ИСПРАВЛЕНИЕ TS2322: Используем оператор '??' для предоставления значения по умолчанию,
-      // если свойство отсутствует, чтобы тип всегда был 'string', а не 'string | undefined'.
+    // --- ИСПРАВЛЕНИЕ ДЛЯ TS2375 ---
 
+    // 1. Создаем базовый объект с обязательными полями.
+    const deploymentConfig: DeploymentConfig = {
       vpsName: config['VPS_NAME'] ?? 'mautibox-vps',
       ipAddress: config['IP_ADDRESS'] ?? '',
       port: config['MAUTIC_PORT'] ?? '8001',
-      domainName: config['DOMAIN_NAME'], // Это поле опционально в DeploymentConfig, '??' не нужно
-      baseDomain: config['BASE_DOMAIN'], // Это поле тоже опционально
-
       emailAddress: config['EMAIL_ADDRESS'] ?? '',
       mauticPassword: config['MAUTIC_PASSWORD'] ?? '',
-
-      clientEmail: config['CLIENT_EMAIL'], // Опциональное поле
-      clientMauticPassword: config['CLIENT_MAUTIC_PASSWORD'], // Опциональное поле
-
       mauticVersion: config['MAUTIC_VERSION'] ?? '6.0.7-apache',
-
-      mauticThemes: config['MAUTIC_THEMES'], // Опциональное поле
-      mauticPlugins: config['MAUTIC_PLUGINS'], // Опциональное поле
-      mauticLanguagePackUrl: config['MAUTIC_LANGUAGE_PACK_URL'], // Опциональное поле
-
       mauticLocale: config['MAUTIC_LOCALE'] ?? 'ru',
       defaultTimezone: config['DEFAULT_TIMEZONE'] ?? 'Europe/Moscow',
-
       mysqlDatabase: config['MYSQL_DATABASE'] ?? 'mautibox_db',
       mysqlUser: config['MYSQL_USER'] ?? 'mautibox_user',
       mysqlPassword: config['MYSQL_PASSWORD'] ?? '',
       mysqlRootPassword: config['MYSQL_ROOT_PASSWORD'] ?? '',
-
-      githubToken: config['GITHUB_TOKEN'] // Опциональное поле
     };
+
+    // 2. Условно добавляем опциональные свойства, только если они существуют.
+    if (config['DOMAIN_NAME']) deploymentConfig.domainName = config['DOMAIN_NAME'];
+    if (config['BASE_DOMAIN']) deploymentConfig.baseDomain = config['BASE_DOMAIN'];
+    if (config['CLIENT_EMAIL']) deploymentConfig.clientEmail = config['CLIENT_EMAIL'];
+    if (config['CLIENT_MAUTIC_PASSWORD']) deploymentConfig.clientMauticPassword = config['CLIENT_MAUTIC_PASSWORD'];
+    if (config['MAUTIC_THEMES']) deploymentConfig.mauticThemes = config['MAUTIC_THEMES'];
+    if (config['MAUTIC_PLUGINS']) deploymentConfig.mauticPlugins = config['MAUTIC_PLUGINS'];
+    if (config['MAUTIC_LANGUAGE_PACK_URL']) deploymentConfig.mauticLanguagePackUrl = config['MAUTIC_LANGUAGE_PACK_URL'];
+    if (config['GITHUB_TOKEN']) deploymentConfig.githubToken = config['GITHUB_TOKEN'];
+
+    // 3. Возвращаем полностью сформированный и типизированный объект.
+    return deploymentConfig;
+
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     if (errorMessage.includes('No such file or directory')) {
