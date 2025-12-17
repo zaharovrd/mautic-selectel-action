@@ -104,11 +104,11 @@ inputs:
   mysql-database:
     description: "MySQL database name"
     required: false
-    default: "mautic_db"
+    default: "mautibox_db"
   mysql-user:
     description: "MySQL user name"
     required: false
-    default: "mautic_db_user"
+    default: "mautibox_db_user"
   mysql-password:
     description: "MySQL password"
     required: true

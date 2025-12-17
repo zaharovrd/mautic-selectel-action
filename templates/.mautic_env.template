@@ -26,7 +26,7 @@ MAUTIC_DATE_FORMAT_DATEONLY='d.m.Y'
 MAUTIC_DATE_FORMAT_TIMEONLY='H:i'
 
 # Docker Configuration
-DOCKER_MAUTIC_ROLE=mautic_web
+DOCKER_MAUTIC_ROLE=mautibox_web
 
 # Installation Configuration
 MAUTIC_DB_PREFIX=
