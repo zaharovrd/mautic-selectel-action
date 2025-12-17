@@ -4,11 +4,10 @@
  */
 
 import type { DeploymentConfig } from './types.ts';
-import { Logger } from './logger.ts'; // Добавим логгер для ясности
+import { Logger } from './logger.ts';
 
 export async function loadDeploymentConfig(): Promise<DeploymentConfig> {
   try {
-    // Читаем стандартный .env файл вместо deploy.env
     const envFilePath = '.env';
     Logger.log(`Loading configuration from ${envFilePath}...`, '📋');
 
@@ -18,10 +17,8 @@ export async function loadDeploymentConfig(): Promise<DeploymentConfig> {
     for (const line of envContent.split('\n')) {
       const trimmed = line.trim();
       if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
-        // Ваша логика парсинга сохранена
         const [key, ...valueParts] = trimmed.split('=');
         if (key) {
-          // Убираем возможные кавычки по краям значения
           let value = valueParts.join('=').trim();
           if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
             value = value.substring(1, value.length - 1);
@@ -43,28 +40,39 @@ export async function loadDeploymentConfig(): Promise<DeploymentConfig> {
       }
     }
 
-    // Возвращаем полный объект DeploymentConfig, включая новые поля
+    // Возвращаем полный объект DeploymentConfig, исправляя ошибки
     return {
-      vpsName: config.VPS_NAME || 'mautibox-vps',
-      ipAddress: config.IP_ADDRESS || '',
-      port: config.MAUTIC_PORT || '8001',
-      domainName: config.DOMAIN_NAME,
-      baseDomain: config.BASE_DOMAIN,
-      emailAddress: config.EMAIL_ADDRESS,
-      mauticPassword: config.MAUTIC_PASSWORD,
-      clientEmail: config.CLIENT_EMAIL,
-      clientMauticPassword: config.CLIENT_MAUTIC_PASSWORD,
-      mauticVersion: config.MAUTIC_VERSION,
-      mauticThemes: config.MAUTIC_THEMES,
-      mauticPlugins: config.MAUTIC_PLUGINS,
-      mauticLanguagePackUrl: config.MAUTIC_LANGUAGE_PACK_URL,
-      mauticLocale: config.MAUTIC_LOCALE || 'ru',
-      defaultTimezone: config.DEFAULT_TIMEZONE || 'Europe/Moscow',
-      mysqlDatabase: config.MYSQL_DATABASE,
-      mysqlUser: config.MYSQL_USER,
-      mysqlPassword: config.MYSQL_PASSWORD,
-      mysqlRootPassword: config.MYSQL_ROOT_PASSWORD,
-      githubToken: config.GITHUB_TOKEN
+      // ИСПРАВЛЕНИЕ TS4111: Используем доступ через квадратные скобки ['...']
+      // ИСПРАВЛЕНИЕ TS2322: Используем оператор '??' для предоставления значения по умолчанию,
+      // если свойство отсутствует, чтобы тип всегда был 'string', а не 'string | undefined'.
+
+      vpsName: config['VPS_NAME'] ?? 'mautibox-vps',
+      ipAddress: config['IP_ADDRESS'] ?? '',
+      port: config['MAUTIC_PORT'] ?? '8001',
+      domainName: config['DOMAIN_NAME'], // Это поле опционально в DeploymentConfig, '??' не нужно
+      baseDomain: config['BASE_DOMAIN'], // Это поле тоже опционально
+
+      emailAddress: config['EMAIL_ADDRESS'] ?? '',
+      mauticPassword: config['MAUTIC_PASSWORD'] ?? '',
+
+      clientEmail: config['CLIENT_EMAIL'], // Опциональное поле
+      clientMauticPassword: config['CLIENT_MAUTIC_PASSWORD'], // Опциональное поле
+
+      mauticVersion: config['MAUTIC_VERSION'] ?? '6.0.7-apache',
+
+      mauticThemes: config['MAUTIC_THEMES'], // Опциональное поле
+      mauticPlugins: config['MAUTIC_PLUGINS'], // Опциональное поле
+      mauticLanguagePackUrl: config['MAUTIC_LANGUAGE_PACK_URL'], // Опциональное поле
+
+      mauticLocale: config['MAUTIC_LOCALE'] ?? 'ru',
+      defaultTimezone: config['DEFAULT_TIMEZONE'] ?? 'Europe/Moscow',
+
+      mysqlDatabase: config['MYSQL_DATABASE'] ?? 'mautibox_db',
+      mysqlUser: config['MYSQL_USER'] ?? 'mautibox_user',
+      mysqlPassword: config['MYSQL_PASSWORD'] ?? '',
+      mysqlRootPassword: config['MYSQL_ROOT_PASSWORD'] ?? '',
+
+      githubToken: config['GITHUB_TOKEN'] // Опциональное поле
     };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
