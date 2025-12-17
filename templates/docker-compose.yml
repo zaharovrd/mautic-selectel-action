@@ -41,7 +41,7 @@ services:
     env_file:
       - .mautic_env
     environment:
-      - DOCKER_MAUTIC_ROLE=mautibox_web
+      - DOCKER_MAUTIC_ROLE=mautic_web
       - DOCKER_MAUTIC_LOAD_TEST_DATA=false # with demodata - password is Maut1cR0cks!
       - DOCKER_MAUTIC_RUN_MIGRATIONS=true
       - MAUTIC_DATE_FORMAT_FULL='d.m.Y H:i:s'
