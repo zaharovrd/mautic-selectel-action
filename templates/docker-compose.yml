@@ -85,7 +85,7 @@ services:
       mautibox_web:
         condition: service_healthy
     links:
-      - db:mysql
+      - mautibox_db:mysql
     env_file:
       - .mautic_env
     environment:
