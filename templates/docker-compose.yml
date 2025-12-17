@@ -1,7 +1,7 @@
 # templates/docker-compose.yml
 version: '3.8'
 
-x-mautic-volumes: &mautic-volumes
+x-mautibox-volumes: &mautibox-volumes
   - mautic_config:/var/www/html/config
   - mautic_plugins:/var/www/html/docroot/plugins
   - mautic_themes:/var/www/html/docroot/themes
@@ -10,7 +10,7 @@ x-mautic-volumes: &mautic-volumes
   - ./logs:/var/www/html/var/logs
 
 services:
-  db:
+  mautibox_db:
     image: mysql:8.0
     container_name: mautibox_db
     env_file:
@@ -26,16 +26,16 @@ services:
       timeout: 15s
       retries: 8
     networks:
-      - mautic
+      - mautibox_net
 
-  mautic:
-    image: mautic/mautic:${MAUTIC_VERSION:-6.0.5-apache}
+  mautibox_web:
+    image: mautic/mautic:${MAUTIC_VERSION}
     container_name: mautibox_web
     depends_on:
-      db:
+      mautibox_db:
         condition: service_healthy
     links:
-      - db:mysql
+      - mautibox_db:mysql
     ports:
       - "${PORT:-8001}:80"
     env_file:
@@ -48,7 +48,7 @@ services:
       - MAUTIC_DATE_FORMAT_SHORT='d.m.Y'
       - MAUTIC_DATE_FORMAT_DATEONLY='d.m.Y'
       - MAUTIC_DATE_FORMAT_TIMEONLY='H:i'
-    volumes: *mautic-volumes
+    volumes: *mautibox-volumes
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost" ]
@@ -57,46 +57,46 @@ services:
       retries: 5
       start_period: 120s
     networks:
-      - mautic
+      - mautibox_net
 
   # Mautic cron jobs
   mautibox_cron:
-    image: mautic/mautic:${MAUTIC_VERSION:-6.0.7-apache}
+    image: mautic/mautic:${MAUTIC_VERSION}
     container_name: mautibox_cron
     depends_on:
-      mautic:
+      mautibox_web:
         condition: service_healthy
     links:
-      - db:mysql
+      - mautibox_db:mysql
     env_file:
       - .mautic_env
     environment:
-      - DOCKER_MAUTIC_ROLE=mautibox_cron
-    volumes: *mautic-volumes
+      - DOCKER_MAUTIC_ROLE=mautic_cron
+    volumes: *mautibox-volumes
     restart: unless-stopped
     networks:
-      - mautic
+      - mautibox_net
 
   # Mautic worker for background processing (disabled by default during initial deployment)
   mautibox_worker:
-    image: mautic/mautic:${MAUTIC_VERSION:-6.0.5-apache}
+    image: mautic/mautic:${MAUTIC_VERSION}
     container_name: mautibox_worker
     depends_on:
-      mautic:
+      mautibox_web:
         condition: service_healthy
     links:
       - db:mysql
     env_file:
       - .mautic_env
     environment:
-      - DOCKER_MAUTIC_ROLE=mautibox_worker
-    volumes: *mautic-volumes
+      - DOCKER_MAUTIC_ROLE=mautic_worker
+    volumes: *mautibox-volumes
     command: php /var/www/html/bin/console messenger:consume email async priority normal --limit=10 --memory-limit=512M
     restart: unless-stopped
     profiles:
       - worker # This allows us to start worker separately after installation
     networks:
-      - mautic
+      - mautibox_net
 
 volumes:
   mautic_config:
@@ -108,5 +108,5 @@ volumes:
 
 
 networks:
-  mautic:
+  mautibox_net:
     driver: bridge

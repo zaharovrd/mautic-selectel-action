@@ -1,6 +1,6 @@
 # templates/.mautic_env
 # Mautic Configuration
-MAUTIC_DB_HOST=mysql
+MAUTIC_DB_HOST=mautibox_db
 MAUTIC_DB_USER=${MYSQL_USER}
 MAUTIC_DB_PASSWORD=${MYSQL_PASSWORD}
 MAUTIC_DB_NAME=${MYSQL_DATABASE}
