@@ -159,7 +159,6 @@ runs:
           echo "❌ Error: mautic-admin-password is required"
           exit 1
         fi
-        fi
         if [ -z "${{ inputs.mysql-password }}" ]; then
           echo "❌ Error: mysql-password is required"
           exit 1
