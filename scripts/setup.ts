@@ -53,7 +53,25 @@ async function main() {
     // Load configuration
     Logger.log('Loading deployment configuration...', '📋');
     const config = await loadDeploymentConfig();
+    Logger.log(`Debug URL from config object: ${config.mauticLanguagePackUrl}`, '🔬');
     Logger.success('Configuration loaded and validated');
+
+    // >>> НАЧАЛО НОВОГО БЛОКА ДИАГНОСТИКИ <<<
+    Logger.log('--- DEPLOYMENT CONFIGURATION ---', '⚙️');
+    // Создаем копию конфига для безопасного вывода в лог
+    const configToLog = { ...config };
+    // Маскируем секреты
+    configToLog.mauticPassword = '*** MASKED ***';
+    configToLog.mysqlPassword = '*** MASKED ***';
+    configToLog.mysqlRootPassword = '*** MASKED ***';
+    configToLog.githubToken = configToLog.githubToken ? '*** MASKED ***' : 'Not provided';
+
+    // Выводим каждую пару ключ-значение
+    for (const [key, value] of Object.entries(configToLog)) {
+      Logger.log(`  - ${key}: ${value || 'Not provided'}`, '⚙️');
+    }
+    Logger.log('----------------------------------', '⚙️');
+    // >>> КОНЕЦ НОВОГО БЛОКА ДИАГНОСТИКИ <<<
 
     // ====================== БЛОК ДЛЯ ДИАГНОСТИКИ ======================
     Logger.log('--- STARTING DIAGNOSTICS ---', '🔬');

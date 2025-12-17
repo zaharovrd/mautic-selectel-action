@@ -33,7 +33,7 @@ export class DockerManager {
   }
 
   static async listMauticContainers(): Promise<ContainerInfo[]> {
-    const containers = ['mautic_web', 'mautic_db', 'mautic_cron'];
+    const containers = ['mautibox_web', 'mautibox_db', 'mautibox_cron'];
     const results: ContainerInfo[] = [];
 
     for (const container of containers) {
@@ -47,7 +47,7 @@ export class DockerManager {
   }
 
   static async getCurrentMauticVersion(): Promise<string | null> {
-    const webContainer = await this.getContainerInfo('mautic_web');
+    const webContainer = await this.getContainerInfo('mautibox_web');
     if (!webContainer) {
       return null;
     }
@@ -119,7 +119,7 @@ export class DockerManager {
       // If we see any restarting containers, get their logs immediately
       if (immediateStatus.output.includes('Restarting')) {
         Logger.log('Detected restarting containers - getting MySQL crash logs...', '🚨');
-        const mysqlCrashLogs = await ProcessManager.runShell('docker logs mautic_db --tail 100', { ignoreError: true });
+        const mysqlCrashLogs = await ProcessManager.runShell('docker logs mautibox_db --tail 100', { ignoreError: true });
         if (mysqlCrashLogs.success) {
           Logger.log('MySQL crash logs (last 100 lines):', '💥');
           Logger.log(mysqlCrashLogs.output, '📋');
@@ -201,7 +201,7 @@ export class DockerManager {
       }
 
       // Show detailed status every 30 seconds for MySQL debugging
-      if (containerName === 'mautic_db' && (i % 30 === 0 || i >= timeoutSeconds - 15)) {
+      if (containerName === 'mautibox_db' && (i % 30 === 0 || i >= timeoutSeconds - 15)) {
         Logger.log(`${containerName} status: ${info?.status || 'unknown'}, health: ${info?.health || 'unknown'}`, '⏳');
 
         // Get MySQL container logs for debugging

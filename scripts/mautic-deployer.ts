@@ -57,7 +57,7 @@ export class MauticDeployer {
 
   private async checkDatabase(): Promise<boolean> {
     const containers = await DockerManager.listMauticContainers();
-    const dbContainer = containers.find(c => c.name === 'mautic_db');
+    const dbContainer = containers.find(c => c.name === 'mautibox_db');
 
     if (dbContainer && dbContainer.status === 'running') {
       Logger.success('✓ Database container is running');
@@ -123,8 +123,8 @@ export class MauticDeployer {
       }
 
       // Wait for containers to be healthy
-      const healthyWeb = await DockerManager.waitForHealthy('mautic_web');
-      const healthyDb = await DockerManager.waitForHealthy('mautic_db');
+      const healthyWeb = await DockerManager.waitForHealthy('mautibox_web');
+      const healthyDb = await DockerManager.waitForHealthy('mautibox_db');
 
       if (!healthyWeb || !healthyDb) {
         throw new Error('Containers failed to become healthy after update');
@@ -133,6 +133,11 @@ export class MauticDeployer {
       // Clear cache after update
       await this.clearCache('after update');
 
+      // Применяем White-Label кастомизацию после обновления
+      await this.applyWhiteLabeling();
+      // Очищаем кэш снова, чтобы применить изменения в шаблонах
+      await this.clearCache('after applying white-labeling post-update');
+
       Logger.success('Mautic update completed successfully');
       return true;
 
@@ -140,6 +145,74 @@ export class MauticDeployer {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Logger.error(`Update failed: ${errorMessage}`);
       return false;
+    }
+  }
+
+  /**
+   * Применяет кастомизацию white-label: заменяет логотипы и добавляет CSS.
+   */
+  private async applyWhiteLabeling(): Promise<void> {
+    Logger.log('🎨 Применение White-Label кастомизации...', '🎨');
+    try {
+      // 1. Замена логотипа в шапке (Header logo)
+      const navbarPath = '/var/www/html/docroot/app/bundles/CoreBundle/Resources/views/Default/navbar.html.twig';
+      const newHeaderLogoUrl = 'https://mautibox.ru/Sidebar%20Logo_130px.png';
+      const headerSedCommand = `sed -i "s|asset('bundles/core/images/mautic_logo_white.png')|'${newHeaderLogoUrl}'|" ${navbarPath}`;
+
+      await ProcessManager.runShell(`docker exec mautibox_web bash -c "${headerSedCommand}"`);
+      Logger.log('✅ Логотип в шапке заменен.', '🎨');
+
+      // 2. Замена логотипа на странице входа (Main logo)
+      const loginPath = '/var/www/html/docroot/app/bundles/UserBundle/Resources/views/Security/base.html.twig';
+      const newLoginLogoUrl = 'https://mautibox.ru/Login_Logo_150px.png';
+      // Заменяем весь блок с изображением для большей надежности
+      const loginSedCommand = `sed -i 's|<img.*mautic_logo_login.*>|<img src=\\"${newLoginLogoUrl}\\" class=\\"img-responsive center-block\\" style=\\"max-width: 150px;\\" />|g' ${loginPath}`;
+
+      await ProcessManager.runShell(`docker exec mautibox_web bash -c "${loginSedCommand}"`);
+      Logger.log('✅ Логотип на странице входа заменен.', '🎨');
+
+      // 3. Добавление кастомного CSS
+      const headPath = '/var/www/html/docroot/app/bundles/CoreBundle/Resources/views/Default/head.html.twig';
+      const customCssBlock = `
+        <style>
+            /* ----- Custom MautiBox Styles ----- */
+            /* Скрываем ссылки на официальные ресурсы Mautic в боковом меню */
+            #aside a[href*="mautic.org"],
+            #aside a[href$="/s/help"] {
+                display: none !important;
+            }
+            /* Пример: меняем основной цвет кнопок */
+            .btn-primary {
+                background-color: #5544B0 !important; /* Фирменный фиолетовый */
+                border-color: #413486 !important;
+            }
+            .btn-primary:hover {
+                background-color: #413486 !important;
+                border-color: #2c245a !important;
+            }
+            /* ----- End Custom Styles ----- */
+        </style>
+      `;
+
+      // Используем сложную команду `sed` для вставки многострочного блока перед </head>
+      // Сначала создаем временный файл с CSS, затем вставляем его содержимое
+      const cssInjectCommand = `
+        cat <<'CSS_EOF' > /tmp/custom-styles.html
+${customCssBlock}
+CSS_EOF
+        sed -i -e '/<\\/head>/r /tmp/custom-styles.html' ${headPath}
+        rm /tmp/custom-styles.html
+      `;
+
+      await ProcessManager.runShell(`docker exec mautibox_web bash -c "${cssInjectCommand.replace(/"/g, '\\"')}"`);
+      Logger.log('✅ Кастомные CSS стили добавлены.', '🎨');
+
+      Logger.success('✅ White-Label кастомизация успешно применена.');
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Logger.error(`⚠️ Ошибка во время применения White-Label кастомизации: ${errorMessage}`);
+      // Не прерываем выполнение, т.к. это не критичная ошибка
     }
   }
 
@@ -231,7 +304,7 @@ export class MauticDeployer {
       Logger.log('Checking MySQL container immediately after startup...', '🔍');
       await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
 
-      const mysqlLogs = await ProcessManager.runShell('docker logs mautic_db --tail 20', { ignoreError: true });
+      const mysqlLogs = await ProcessManager.runShell('docker logs mautibox_db --tail 20', { ignoreError: true });
       if (mysqlLogs.success) {
         Logger.log('MySQL startup logs:', '📋');
         Logger.log(mysqlLogs.output, '📄');
@@ -239,16 +312,26 @@ export class MauticDeployer {
 
       // Wait for services to be ready
       Logger.log('Waiting for database to be healthy (up to 3 minutes)...', '🗄️');
-      await DockerManager.waitForHealthy('mautic_db', 180);
+      await DockerManager.waitForHealthy('mautibox_db', 180);
 
       Logger.log('Waiting for Mautic web container to be healthy (up to 5 minutes)...', '🌐');
-      await DockerManager.waitForHealthy('mautic_web', 300);
+      await DockerManager.waitForHealthy('mautibox_web', 300);
+
+      // Install custom language pack if specified
+      if (this.config.mauticLanguagePackUrl && this.config.mauticLocale) {
+        Logger.log('=== STARTING LANGUAGE PACK INSTALLATION ===', '🌐');
+        await this.installLanguagePack();
+        Logger.log('=== LANGUAGE PACK INSTALLATION COMPLETED ===', '🌐');
+      } else {
+        Logger.log('No custom language pack configured for installation', 'ℹ️');
+      }
 
       // Run Mautic installation inside the container
       await this.runMauticInstallation();
 
-      // Clear cache after installation
-      await this.clearCache('after installation');
+      // Очищаем кеш, чтобы Mautic подхватил все переменные окружения из .mautic_env
+      Logger.log('Applying environment configurations by clearing cache...', '⚙️');
+      await this.clearCache('to apply environment settings');
 
       // Fix media .htaccess files if they have incorrect configuration
       await this.fixMediaHtaccess();
@@ -272,6 +355,11 @@ export class MauticDeployer {
         Logger.log('No themes or plugins configured for installation', 'ℹ️');
       }
 
+      // Применяем White-Label кастомизацию
+      await this.applyWhiteLabeling();
+      // Очищаем кэш после кастомизации для применения изменений
+      await this.clearCache('after applying white-labeling');
+
       Logger.success('Mautic installation completed successfully');
       return true;
 
@@ -284,7 +372,6 @@ export class MauticDeployer {
 
   private async createEnvironmentFile(): Promise<void> {
     Logger.log('Creating environment configuration...', '⚙️');
-
     const envContent = `
 # Database Configuration
 MAUTIC_DB_HOST=mysql
@@ -296,15 +383,17 @@ MAUTIC_DB_PORT=3306
 # Mautic Configuration
 MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
 MAUTIC_RUN_CRON_JOBS=true
+MAUTIC_LOCALE=${this.config.mauticLocale || 'en_US'}
+MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}
 
 # Admin Configuration
-MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
-MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
-MAUTIC_ADMIN_FIRSTNAME=Admin
-MAUTIC_ADMIN_LASTNAME=User
+# MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
+# MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
+# MAUTIC_ADMIN_FIRSTNAME=Admin
+# MAUTIC_ADMIN_LASTNAME=User
 
 # Docker Configuration - will be overridden per container
-DOCKER_MAUTIC_ROLE=mautic_web
+DOCKER_MAUTIC_ROLE=mautibox_web
 
 # Installation Configuration
 MAUTIC_DB_PREFIX=
@@ -325,6 +414,62 @@ PORT=${this.config.port}
     await Deno.chmod('.mautic_env', 0o600);
 
     Logger.success('Environment file created');
+  }
+  private async installLanguagePack(): Promise<void> {
+    if (!this.config.mauticLanguagePackUrl) return;
+
+    Logger.log(`Installing language pack from: ${this.config.mauticLanguagePackUrl}`, '🌐');
+
+    try {
+      // Используем -f, чтобы curl завершился с ошибкой (>0) при кодах 4xx/5xx
+      const curlCommand = `curl -fL -o langpack.zip --connect-timeout 30 --max-time 120 "${this.config.mauticLanguagePackUrl}"`;
+
+      const commands = [
+        'echo "--- STARTING LANGUAGE PACK INSTALLATION ---"',
+        'echo "Running as user: $(whoami)"',
+        'echo "STEP 1: Ensuring dependencies (curl, unzip)..."',
+        'apt-get update -y && apt-get install -yq curl unzip',
+        'echo "STEP 2: Creating directory structure..."',
+        'mkdir -p /var/www/html/docroot/translations && cd /var/www/html/docroot/translations',
+        'echo "Now in directory: $(pwd)"',
+        'echo "STEP 3: Downloading language pack..."',
+        curlCommand,
+        'echo "STEP 4: Verifying downloaded file..."',
+        'file langpack.zip', // Проверяем, что файл скачался и это ZIP-архив
+        'echo "STEP 5: Unzipping file..."',
+        'unzip -oq langpack.zip -d .',
+        'echo "STEP 6: Cleaning up..."',
+        'rm langpack.zip',
+        'echo "STEP 7: Fixing ownership for www-data user..."',
+        'chown -R www-data:www-data /var/www/html/docroot/translations',
+        'echo "STEP 8: Verifying final file list:"',
+        'ls -lA', // Финальная проверка - выводим список файлов
+        'echo "--- LANGUAGE PACK INSTALLATION FINISHED ---"'
+      ];
+
+      const fullCommand = commands.join(' && ');
+
+      // ЗАПУСКАЕМ ОТ ROOT! Это решает проблемы с правами для `apt-get`, `mkdir` и `chown`.
+      const result = await ProcessManager.runShell(
+        `docker exec --user root mautibox_web bash -c '${fullCommand}'`,
+        { ignoreError: true }
+      );
+
+      Logger.log("--- Language Pack Installation Output ---", "📋");
+      Logger.log(result.output, "📄");
+      Logger.log("--- End of Output ---", "📋");
+
+      if (!result.success) {
+        throw new Error(`Failed to install language pack. See output above for details.`);
+      }
+
+      Logger.success(`Language pack for '${this.config.mauticLocale}' installed successfully.`);
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Logger.error(`❌ Failed to install language pack: ${errorMessage}`);
+      throw error;
+    }
   }
 
   private async createDockerCompose(): Promise<void> {
@@ -669,11 +814,11 @@ PORT=${this.config.port}
       // Handle upgrades: remove existing theme directory if it exists
       if (directory) {
         Logger.log(`🔄 Checking for existing theme: ${directory}`, '🔄');
-        const checkExisting = await ProcessManager.runShell(`docker exec mautic_web bash -c 'test -d /var/www/html/docroot/themes/${directory}'`, { ignoreError: true });
+        const checkExisting = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'test -d /var/www/html/docroot/themes/${directory}'`, { ignoreError: true });
 
         if (checkExisting.success) {
           Logger.log(`🗑️ Removing existing theme directory: ${directory}`, '🗑️');
-          const removeResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'rm -rf /var/www/html/docroot/themes/${directory}'`, { ignoreError: true });
+          const removeResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'rm -rf /var/www/html/docroot/themes/${directory}'`, { ignoreError: true });
 
           if (!removeResult.success) {
             Logger.log(`⚠️ Warning: Could not remove existing theme directory: ${removeResult.output}`, '⚠️');
@@ -711,13 +856,13 @@ PORT=${this.config.port}
       }
 
       await ProcessManager.runShell(`
-        docker exec mautic_web bash -c "cd /var/www/html/docroot/themes && ${curlCommand} && ${extractCommand}"
+        docker exec mautibox_web bash -c "cd /var/www/html/docroot/themes && ${curlCommand} && ${extractCommand}"
       `, { ignoreError: true });
 
       // Fix ownership and permissions for the theme directory if specified
       if (directory) {
         Logger.log(`🔒 Setting correct ownership and permissions for theme ${directory}...`, '🔒');
-        const chownResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'chown -R www-data:www-data /var/www/html/docroot/themes/${directory} && chmod -R 755 /var/www/html/docroot/themes/${directory}'`, { ignoreError: true });
+        const chownResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'chown -R www-data:www-data /var/www/html/docroot/themes/${directory} && chmod -R 755 /var/www/html/docroot/themes/${directory}'`, { ignoreError: true });
 
         if (chownResult.success) {
           Logger.log(`✅ Theme ownership and permissions set correctly`, '✅');
@@ -728,7 +873,7 @@ PORT=${this.config.port}
 
       // Clear cache after theme installation
       Logger.log(`🧹 Clearing cache after theme installation...`, '🧹');
-      const cacheResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html && rm -rf var/cache/prod/*'`, { ignoreError: true });
+      const cacheResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html && rm -rf var/cache/prod/*'`, { ignoreError: true });
 
       if (!cacheResult.success) {
         Logger.log(`⚠️ Warning: Cache clear failed: ${cacheResult.output}`, '⚠️');
@@ -782,16 +927,16 @@ PORT=${this.config.port}
       const authToken = token || this.config.githubToken;
 
       // Clean up any leftover temp directories from previous failed extractions
-      await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && rm -rf temp_extract'`, { ignoreError: true });
+      await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && rm -rf temp_extract'`, { ignoreError: true });
 
       // Handle upgrades: remove existing plugin directory if it exists
       if (directory) {
         Logger.log(`🔄 Checking for existing plugin: ${directory}`, '🔄');
-        const checkExisting = await ProcessManager.runShell(`docker exec mautic_web bash -c 'test -d /var/www/html/docroot/plugins/${directory}'`, { ignoreError: true });
+        const checkExisting = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'test -d /var/www/html/docroot/plugins/${directory}'`, { ignoreError: true });
 
         if (checkExisting.success) {
           Logger.log(`🗑️ Removing existing plugin directory: ${directory}`, '🗑️');
-          const removeResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'rm -rf /var/www/html/docroot/plugins/${directory}'`, { ignoreError: true });
+          const removeResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'rm -rf /var/www/html/docroot/plugins/${directory}'`, { ignoreError: true });
 
           if (!removeResult.success) {
             Logger.log(`⚠️ Warning: Could not remove existing plugin directory: ${removeResult.output}`, '⚠️');
@@ -804,7 +949,7 @@ PORT=${this.config.port}
       }
 
       // Check if required tools are available in container
-      const toolsCheck = await ProcessManager.runShell(`docker exec mautic_web bash -c 'which curl && which unzip && which file'`, { ignoreError: true });
+      const toolsCheck = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'which curl && which unzip && which file'`, { ignoreError: true });
       if (!toolsCheck.success) {
         Logger.log(`⚠️ Warning: Some required tools may be missing in container: ${toolsCheck.output}`, '⚠️');
       } else {
@@ -815,9 +960,9 @@ PORT=${this.config.port}
       let downloadCommand;
       if (authToken && cleanUrl.includes('github.com')) {
         // For GitHub API with authentication, use curl with proper headers
-        downloadCommand = `docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && curl -L -o plugin.zip -H "Authorization: Bearer ${authToken}" -H "Accept: application/vnd.github.v3+json" --connect-timeout 30 --max-time 60 --retry 2 "${cleanUrl}"'`;
+        downloadCommand = `docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && curl -L -o plugin.zip -H "Authorization: Bearer ${authToken}" -H "Accept: application/vnd.github.v3+json" --connect-timeout 30 --max-time 60 --retry 2 "${cleanUrl}"'`;
       } else {
-        downloadCommand = `docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && curl -L -o plugin.zip --connect-timeout 30 --max-time 60 --retry 2 "${cleanUrl}"'`;
+        downloadCommand = `docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && curl -L -o plugin.zip --connect-timeout 30 --max-time 60 --retry 2 "${cleanUrl}"'`;
       }
 
       const downloadResult = await ProcessManager.runShell(downloadCommand, { ignoreError: true });
@@ -832,7 +977,7 @@ PORT=${this.config.port}
       }
 
       // Validate ZIP file before extraction
-      const validateResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && file plugin.zip'`, { ignoreError: true });
+      const validateResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && file plugin.zip'`, { ignoreError: true });
 
       if (!validateResult.success) {
         Logger.log(`⚠️ Could not validate ZIP file: ${validateResult.output}`, '⚠️');
@@ -840,7 +985,7 @@ PORT=${this.config.port}
         Logger.log(`📁 ZIP file info: ${validateResult.output}`, '📁');
         if (!validateResult.output.includes('Zip archive data')) {
           // Clean up invalid file
-          await ProcessManager.runShell('docker exec mautic_web bash -c "cd /var/www/html/docroot/plugins && rm -f plugin.zip"', { ignoreError: true });
+          await ProcessManager.runShell('docker exec mautibox_web bash -c "cd /var/www/html/docroot/plugins && rm -f plugin.zip"', { ignoreError: true });
           throw new Error('Downloaded file is not a valid ZIP archive');
         }
       }
@@ -854,7 +999,7 @@ PORT=${this.config.port}
           Logger.log(`🔍 Extracting GitHub API zipball to ${directory}...`, '🔍');
 
           // First, let's see what's in the zip
-          const zipContents = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && unzip -l plugin.zip'`, { ignoreError: true });
+          const zipContents = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && unzip -l plugin.zip'`, { ignoreError: true });
           if (zipContents.success) {
             Logger.log(`📋 ZIP file contents:`, '📋');
             Logger.log(zipContents.output, '📄');
@@ -893,7 +1038,7 @@ cd .. && \\
 echo "Cleaning up temp_extract" && \\
 rm -rf temp_extract && \\
 echo "=== EXTRACTION PROCESS COMPLETE ==="`;
-          extractResult = await ProcessManager.runShell(`docker exec mautic_web bash -c '${extractCmd}'`, { ignoreError: true });
+          extractResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c '${extractCmd}'`, { ignoreError: true });
 
           // Log what happened during extraction
           Logger.log(`📋 EXTRACTION OUTPUT:`, '📋');
@@ -902,7 +1047,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
           if (!extractResult.success) {
             Logger.log(`❌ GitHub API zipball extraction failed with exit code: ${extractResult.exitCode}`, '❌');
             // Check if temp_extract still exists and what's in it
-            const tempCheck = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && if [ -d temp_extract ]; then echo "temp_extract still exists:"; ls -la temp_extract; else echo "temp_extract does not exist"; fi'`, { ignoreError: true });
+            const tempCheck = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && if [ -d temp_extract ]; then echo "temp_extract still exists:"; ls -la temp_extract; else echo "temp_extract does not exist"; fi'`, { ignoreError: true });
             if (tempCheck.success) {
               Logger.log(`📋 temp_extract status after failed extraction:`, '📋');
               Logger.log(tempCheck.output, '📄');
@@ -911,17 +1056,17 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
             Logger.log(`✅ GitHub API zipball extraction command completed successfully`, '✅');
 
             // CRITICAL: Check if files actually made it to the target directory
-            const finalCheck = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && echo "=== FINAL VERIFICATION ===" && ls -la ${directory}/ && echo "=== FILE COUNT ===" && find ${directory} -type f | wc -l && echo "=== SAMPLE FILES ===" && find ${directory} -type f | head -5'`, { ignoreError: true });
+            const finalCheck = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && echo "=== FINAL VERIFICATION ===" && ls -la ${directory}/ && echo "=== FILE COUNT ===" && find ${directory} -type f | wc -l && echo "=== SAMPLE FILES ===" && find ${directory} -type f | head -5'`, { ignoreError: true });
             if (finalCheck.success) {
               Logger.log(`📋 FINAL EXTRACTION VERIFICATION:`, '📋');
               Logger.log(finalCheck.output, '📄');
             }
           }
         } else {
-          extractResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && mkdir -p "${directory}" && unzip -o plugin.zip -d "${directory}" && rm plugin.zip'`, { ignoreError: true });
+          extractResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && mkdir -p "${directory}" && unzip -o plugin.zip -d "${directory}" && rm plugin.zip'`, { ignoreError: true });
         }
       } else {
-        extractResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && unzip -o plugin.zip && rm plugin.zip'`, { ignoreError: true });
+        extractResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && unzip -o plugin.zip && rm plugin.zip'`, { ignoreError: true });
       }
 
       if (!extractResult.success) {
@@ -931,7 +1076,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         Logger.log(`✅ Extraction completed successfully`, '✅');
 
         // Verify what was installed
-        const verifyResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html/docroot/plugins && ls -la'`, { ignoreError: true });
+        const verifyResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html/docroot/plugins && ls -la'`, { ignoreError: true });
         if (verifyResult.success) {
           Logger.log(`📋 Plugin directory contents after installation:`, '📋');
           Logger.log(verifyResult.output, '📄');
@@ -939,7 +1084,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
 
         // Show detailed contents of the specific plugin directory
         if (directory) {
-          const detailCheck = await ProcessManager.runShell(`docker exec mautic_web bash -c 'ls -la /var/www/html/docroot/plugins/${directory}/ && echo "File count:" && find /var/www/html/docroot/plugins/${directory} -type f | wc -l'`, { ignoreError: true });
+          const detailCheck = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'ls -la /var/www/html/docroot/plugins/${directory}/ && echo "File count:" && find /var/www/html/docroot/plugins/${directory} -type f | wc -l'`, { ignoreError: true });
           if (detailCheck.success) {
             Logger.log(`📋 Detailed contents of ${directory} directory:`, '📋');
             Logger.log(detailCheck.output, '📄');
@@ -948,13 +1093,13 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
 
         // Verify that the main plugin file exists if we have a directory name
         if (directory) {
-          const pluginFileCheck = await ProcessManager.runShell(`docker exec mautic_web bash -c 'test -f /var/www/html/docroot/plugins/${directory}/${directory}.php'`, { ignoreError: true });
+          const pluginFileCheck = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'test -f /var/www/html/docroot/plugins/${directory}/${directory}.php'`, { ignoreError: true });
 
           if (pluginFileCheck.success) {
             Logger.log(`✅ Main plugin file ${directory}.php found in correct location`, '✅');
           } else {
             Logger.log(`⚠️ Warning: Main plugin file ${directory}.php not found, checking directory contents...`, '⚠️');
-            const dirContents = await ProcessManager.runShell(`docker exec mautic_web bash -c 'ls -la /var/www/html/docroot/plugins/${directory}/'`, { ignoreError: true });
+            const dirContents = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'ls -la /var/www/html/docroot/plugins/${directory}/'`, { ignoreError: true });
             if (dirContents.success) {
               Logger.log(`📋 Directory contents for ${directory}:`, '📋');
               Logger.log(dirContents.output, '📄');
@@ -963,7 +1108,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
 
           // Fix ownership and permissions for the plugin directory
           Logger.log(`🔒 Setting correct ownership and permissions for ${directory}...`, '🔒');
-          const chownResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'chown -R www-data:www-data /var/www/html/docroot/plugins/${directory} && chmod -R 755 /var/www/html/docroot/plugins/${directory}'`, { ignoreError: true });
+          const chownResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'chown -R www-data:www-data /var/www/html/docroot/plugins/${directory} && chmod -R 755 /var/www/html/docroot/plugins/${directory}'`, { ignoreError: true });
 
           if (chownResult.success) {
             Logger.log(`✅ Ownership and permissions set correctly`, '✅');
@@ -972,7 +1117,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
           }
 
           // Verify final ownership and permissions
-          const permCheck = await ProcessManager.runShell(`docker exec mautic_web bash -c 'ls -la /var/www/html/docroot/plugins/${directory}/'`, { ignoreError: true });
+          const permCheck = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'ls -la /var/www/html/docroot/plugins/${directory}/'`, { ignoreError: true });
           if (permCheck.success) {
             Logger.log(`📋 Final ownership and permissions for ${directory}:`, '📋');
             Logger.log(permCheck.output, '📄');
@@ -981,7 +1126,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
 
         // Clear cache first to ensure autoloading works
         Logger.log(`🧹 Clearing cache before plugin registration...`, '🧹');
-        const preCacheResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html && rm -rf var/cache/prod/* var/cache/dev/*'`, { ignoreError: true });
+        const preCacheResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html && rm -rf var/cache/prod/* var/cache/dev/*'`, { ignoreError: true });
 
         if (!preCacheResult.success) {
           Logger.log(`⚠️ Warning: Pre-cache clear failed: ${preCacheResult.output}`, '⚠️');
@@ -991,13 +1136,13 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
 
         // Run Mautic plugin installation command
         Logger.log(`🔧 Running Mautic plugin installation command...`, '🔧');
-        const consoleResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html && php bin/console mautic:plugins:install --force'`, { ignoreError: true });
+        const consoleResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html && php bin/console mautic:plugins:install --force'`, { ignoreError: true });
 
         if (!consoleResult.success) {
           Logger.log(`⚠️ Warning: Plugin console command failed: ${consoleResult.output}`, '⚠️');
           // Try alternative approach: just reload plugins
           Logger.log(`🔄 Trying alternative plugin reload...`, '🔄');
-          const reloadResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html && php bin/console mautic:plugins:reload'`, { ignoreError: true });
+          const reloadResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html && php bin/console mautic:plugins:reload'`, { ignoreError: true });
           if (reloadResult.success) {
             Logger.log(`✅ Plugin reload successful`, '✅');
             Logger.log(reloadResult.output, '📄');
@@ -1011,7 +1156,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
 
         // Clear cache after plugin installation
         Logger.log(`🧹 Clearing cache after plugin installation...`, '🧹');
-        const cacheResult = await ProcessManager.runShell(`docker exec mautic_web bash -c 'cd /var/www/html && rm -rf var/cache/prod/* var/cache/dev/*'`, { ignoreError: true });
+        const cacheResult = await ProcessManager.runShell(`docker exec mautibox_web bash -c 'cd /var/www/html && rm -rf var/cache/prod/* var/cache/dev/*'`, { ignoreError: true });
 
         if (!cacheResult.success) {
           Logger.log(`⚠️ Warning: Cache clear failed: ${cacheResult.output}`, '⚠️');
@@ -1041,9 +1186,9 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
       Logger.log('Pre-installation check: Testing database connection...', '🔍');
       try {
         const dbTest = await ProcessManager.run([
-          'docker', 'exec', 'mautic_web',
+          'docker', 'exec', 'mautibox_web',
           'php', '-r',
-          `try { $pdo = new PDO('mysql:host=mautic_db;dbname=${this.config.mysqlDatabase}', '${this.config.mysqlUser}', '${this.config.mysqlPassword}'); echo 'DB_CONNECTION_OK'; } catch(Exception $e) { echo 'DB_ERROR: ' . $e->getMessage(); }`
+          `try { $pdo = new PDO('mysql:host=mautibox_db;dbname=${this.config.mysqlDatabase}', '${this.config.mysqlUser}', '${this.config.mysqlPassword}'); echo 'DB_CONNECTION_OK'; } catch(Exception $e) { echo 'DB_ERROR: ' . $e->getMessage(); }`
         ]);
         Logger.log(`Database test result: ${dbTest.output}`, '📊');
       } catch (error) {
@@ -1054,7 +1199,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
       Logger.log('Testing mautic:install command availability...', '🔍');
       try {
         const helpResult = await ProcessManager.run([
-          'docker', 'exec', 'mautic_web',
+          'docker', 'exec', 'mautibox_web',
           'timeout', '30',  // 30 second timeout
           'php', '/var/www/html/bin/console', 'mautic:install', '--help'
         ]);
@@ -1075,16 +1220,18 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         : `http://${this.config.ipAddress}:${this.config.port}`;
 
       Logger.log(`Site URL: ${siteUrl}`, '🌐');
-      Logger.log('Database: mautic_db', '🗄️');
+      Logger.log('Database: mautibox_db', '🗄️');
       Logger.log(`Admin email: ${this.config.emailAddress}`, '👤');
+      // ✅ --- ДОБАВЛЕН БЛОК ЛОГИРОВАНИЯ И КОМАНДЫ --- ✅
+      Logger.log(`Default Language: ${this.config.mauticLocale}`, '🗣️');
+      Logger.log(`Default Timezone: ${this.config.defaultTimezone}`, '🕒');
 
-      // Use timeout command to limit installation time
       const installResult = await ProcessManager.run([
         'timeout', '300', // 5 minutes timeout
         'docker', 'exec',
         '--user', 'www-data',
         '--workdir', '/var/www/html',
-        'mautic_web',
+        'mautibox_web',
         'php', './bin/console', 'mautic:install',
         siteUrl,
         '--admin_email=' + this.config.emailAddress,
@@ -1093,6 +1240,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         '--no-interaction',
         '-vvv'
       ], { timeout: 320000 }); // ProcessManager timeout slightly longer than shell timeout
+
 
       if (installResult.success) {
         Logger.success('✅ Mautic installation completed successfully');
@@ -1128,7 +1276,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
 
       // Check if images .htaccess needs fixing
       const checkImagesHtaccess = await ProcessManager.runShell(
-        `docker exec mautic_web bash -c 'cat /var/www/html/docroot/media/images/.htaccess 2>/dev/null'`,
+        `docker exec mautibox_web bash -c 'cat /var/www/html/docroot/media/images/.htaccess 2>/dev/null'`,
         { ignoreError: true }
       );
 
@@ -1136,7 +1284,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         Logger.log(`⚠️ Found incorrect .htaccess in images directory, fixing...`, '⚠️');
 
         const fixImagesResult = await ProcessManager.runShell(
-          `docker exec mautic_web bash -c 'cat > /var/www/html/docroot/media/images/.htaccess << "EOF"
+          `docker exec mautibox_web bash -c 'cat > /var/www/html/docroot/media/images/.htaccess << "EOF"
 ${officialMediaHtaccess}
 EOF'`,
           { ignoreError: true }
@@ -1153,7 +1301,7 @@ EOF'`,
 
       // Check if files .htaccess needs fixing
       const checkFilesHtaccess = await ProcessManager.runShell(
-        `docker exec mautic_web bash -c 'cat /var/www/html/docroot/media/files/.htaccess 2>/dev/null'`,
+        `docker exec mautibox_web bash -c 'cat /var/www/html/docroot/media/files/.htaccess 2>/dev/null'`,
         { ignoreError: true }
       );
 
@@ -1161,7 +1309,7 @@ EOF'`,
         Logger.log(`⚠️ Found incorrect .htaccess in files directory, fixing...`, '⚠️');
 
         const fixFilesResult = await ProcessManager.runShell(
-          `docker exec mautic_web bash -c 'cat > /var/www/html/docroot/media/files/.htaccess << "EOF"
+          `docker exec mautibox_web bash -c 'cat > /var/www/html/docroot/media/files/.htaccess << "EOF"
 ${officialMediaHtaccess}
 EOF'`,
           { ignoreError: true }
@@ -1194,7 +1342,7 @@ EOF'`,
       // Use simple rm command - much faster than PHP console commands
       // Clear both prod and dev cache directories to be safe
       await ProcessManager.run([
-        'docker', 'exec', 'mautic_web',
+        'docker', 'exec', 'mautibox_web',
         'bash', '-c', 'rm -rf /var/www/html/var/cache/prod* /var/www/html/var/cache/dev* || true'
       ], { timeout: 30000 }); // 30 second timeout - should be very fast
 

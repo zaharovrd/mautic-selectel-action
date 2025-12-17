@@ -6,12 +6,13 @@ x-mautic-volumes: &mautic-volumes
   - mautic_plugins:/var/www/html/docroot/plugins
   - mautic_themes:/var/www/html/docroot/themes
   - mautic_media:/var/www/html/docroot/media
+  - mautic_translations:/var/www/html/docroot/translations
   - ./logs:/var/www/html/var/logs
 
 services:
   db:
     image: mysql:8.0
-    container_name: mautic_db
+    container_name: mautibox_db
     env_file:
       - .mautic_env
     volumes:
@@ -29,7 +30,7 @@ services:
 
   mautic:
     image: mautic/mautic:${MAUTIC_VERSION:-6.0.5-apache}
-    container_name: mautic_web
+    container_name: mautibox_web
     depends_on:
       db:
         condition: service_healthy
@@ -41,8 +42,12 @@ services:
       - .mautic_env
     environment:
       - DOCKER_MAUTIC_ROLE=mautic_web
-      - DOCKER_MAUTIC_LOAD_TEST_DATA=false
+      - DOCKER_MAUTIC_LOAD_TEST_DATA=false # with demodata - password is Maut1cR0cks!
       - DOCKER_MAUTIC_RUN_MIGRATIONS=true
+      - MAUTIC_DATE_FORMAT_FULL='d.m.Y H:i:s'
+      - MAUTIC_DATE_FORMAT_SHORT='d.m.Y'
+      - MAUTIC_DATE_FORMAT_DATEONLY='d.m.Y'
+      - MAUTIC_DATE_FORMAT_TIMEONLY='H:i'
     volumes: *mautic-volumes
     restart: unless-stopped
     healthcheck:
@@ -55,9 +60,9 @@ services:
       - mautic
 
   # Mautic cron jobs
-  mautic_cron:
-    image: mautic/mautic:${MAUTIC_VERSION:-6.0.5-apache}
-    container_name: mautic_cron
+  mautibox_cron:
+    image: mautic/mautic:${MAUTIC_VERSION:-6.0.7-apache}
+    container_name: mautibox_cron
     depends_on:
       mautic:
         condition: service_healthy
@@ -66,16 +71,16 @@ services:
     env_file:
       - .mautic_env
     environment:
-      - DOCKER_MAUTIC_ROLE=mautic_cron
+      - DOCKER_MAUTIC_ROLE=mautibox_cron
     volumes: *mautic-volumes
     restart: unless-stopped
     networks:
       - mautic
 
   # Mautic worker for background processing (disabled by default during initial deployment)
-  mautic_worker:
+  mautibox_worker:
     image: mautic/mautic:${MAUTIC_VERSION:-6.0.5-apache}
-    container_name: mautic_worker
+    container_name: mautibox_worker
     depends_on:
       mautic:
         condition: service_healthy
@@ -84,7 +89,7 @@ services:
     env_file:
       - .mautic_env
     environment:
-      - DOCKER_MAUTIC_ROLE=mautic_worker
+      - DOCKER_MAUTIC_ROLE=mautibox_worker
     volumes: *mautic-volumes
     command: php /var/www/html/bin/console messenger:consume email async priority normal --limit=10 --memory-limit=512M
     restart: unless-stopped
@@ -98,6 +103,7 @@ volumes:
   mautic_plugins:
   mautic_themes:
   mautic_media:
+  mautic_translations:
   mysql_data:
 
 
