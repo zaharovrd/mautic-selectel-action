@@ -307,9 +307,17 @@ fi
 
 echo "🚀 Deploying to server..."
 ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "mkdir -p /var/www"
-scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" deploy.env docker-compose.yml .mautic_env.template root@${VPS_IP}:/var/www/
-scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" build/setup root@${VPS_IP}:/var/www/setup
-ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && chmod +x setup"
+
+scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" \
+    .env \
+    "${ACTION_PATH}/templates/docker-compose.yml" \
+    "${ACTION_PATH}/templates/.mautic_env.template" \
+    "${ACTION_PATH}/scripts/configure.sh" \
+    build/setup \
+    root@${VPS_IP}:/var/www/
+
+# После копирования даем права на исполнение обоим скриптам
+ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && chmod +x setup configure.sh"
 
 echo "⚙️  Running setup on server..."
 ssh -f -o StrictHostKeyChecking=no \
