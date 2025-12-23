@@ -1,5 +1,4 @@
 # templates/docker-compose.yml
-version: '3.8'
 
 x-mautibox-volumes: &mautibox-volumes
   - mautic_config:/var/www/html/config
@@ -42,12 +41,7 @@ services:
       - .mautic_env
     environment:
       - DOCKER_MAUTIC_ROLE=mautic_web
-      - DOCKER_MAUTIC_LOAD_TEST_DATA=false # with demodata - password is Maut1cR0cks!
-      - DOCKER_MAUTIC_RUN_MIGRATIONS=true
-      - MAUTIC_DATE_FORMAT_FULL='d.m.Y H:i:s'
-      - MAUTIC_DATE_FORMAT_SHORT='d.m.Y'
-      - MAUTIC_DATE_FORMAT_DATEONLY='d.m.Y'
-      - MAUTIC_DATE_FORMAT_TIMEONLY='H:i'
+      - DOCKER_MAUTIC_LOAD_TEST_DATA=false
     volumes: *mautibox-volumes
     restart: unless-stopped
     healthcheck:
