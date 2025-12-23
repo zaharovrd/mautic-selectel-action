@@ -159,9 +159,7 @@ async function main() {
     }
 
     // Setup SSL if domain is provided
-    if (config.domainName) {
-      await sslManager.setupSSL();
-    }
+    await sslManager.configureNginxAndSSL();
 
     // Final validation
     Logger.log('Performing final system validation...', '✅');
