@@ -246,27 +246,52 @@ CSS_EOF
       return;
     }
 
-    Logger.log(`👤 Creating non-admin user for ${clientEmail}...`, '👤');
+    Logger.log(`👤 Creating non-admin user for ${clientEmail} via direct SQL insert...`, '👤');
     try {
-      const createUserCommand = [
-        'php', './bin/console', 'mautic:users:create',
-        '--firstname="Client"',
-        '--lastname="User"',
-        `--email="${clientEmail}"`,
-        `--username="${clientEmail}"`,
-        '--role=2', // ID стандартной роли "User"
-        `--password="${clientPassword}"`,
-        '--no-interaction'
-      ].join(' ');
+      // 1. Генерируем хэш пароля внутри контейнера mautibox_web
+      Logger.log('   - Generating password hash...');
+      const hashCommand = `php -r "echo password_hash('${clientPassword}', PASSWORD_BCRYPT);"`;
+      const hashResult = await ProcessManager.runShell(
+        `docker exec mautibox_web bash -c "${hashCommand}"`
+      );
+      if (!hashResult.success || !hashResult.output.startsWith('$2y$')) {
+        throw new Error(`Failed to generate password hash. Output: ${hashResult.output}`);
+      }
+      const hashedPassword = hashResult.output.trim();
+      Logger.success('   - Password hash generated.');
 
-      const result = await ProcessManager.runShell(
-        `docker exec --user www-data --workdir /var/www/html mautibox_web ${createUserCommand}`
+      // 2. Формируем SQL-запрос для вставки пользователя
+      // role_id = 2 это стандартная роль "User"
+      // last_active и last_login устанавливаем на текущее время
+      const sqlQuery = `
+            INSERT INTO users (role_id, username, password, email, first_name, last_name, is_published, date_added, last_active, last_login)
+            VALUES (
+                2,
+                '${clientEmail}',
+                '${hashedPassword}',
+                '${clientEmail}',
+                'Client',
+                'User',
+                1,
+                NOW(),
+                NOW(),
+                NOW()
+            )
+            ON DUPLICATE KEY UPDATE password='${hashedPassword}';
+        `;
+
+      // 3. Выполняем SQL-запрос внутри контейнера mautibox_db
+      Logger.log('   - Inserting user into the database...');
+      // Команда экранирует одинарные кавычки для безопасного выполнения
+      const dbCommand = `mysql -u"${this.config.mysqlUser}" -p"${this.config.mysqlPassword}" "${this.config.mysqlDatabase}" -e "${sqlQuery.replace(/"/g, '\\"')}"`;
+      const dbResult = await ProcessManager.runShell(
+        `docker exec mautibox_db bash -c "${dbCommand}"`
       );
 
-      if (result.success && result.output.includes('New user ID')) {
-        Logger.success(`✅ Client user ${clientEmail} created successfully.`);
+      if (dbResult.success) {
+        Logger.success(`✅ Client user ${clientEmail} created/updated successfully.`);
       } else {
-        throw new Error(result.output || 'Failed to create user.');
+        throw new Error(dbResult.output || 'Failed to insert user into database.');
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
