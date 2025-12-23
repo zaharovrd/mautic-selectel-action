@@ -1252,6 +1252,17 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         Logger.log(`Install command test failed: ${error}`, '❌');
         throw new Error('mautic:install command not available or hanging');
       }
+      Logger.log('Syncing Doctrine metadata storage before installation...', '⚙️');
+      const syncMetaCommand = 'php ./bin/console doctrine:migrations:sync-metadata-storage --no-interaction';
+      const syncResult = await ProcessManager.runShell(
+        `docker exec --user www-data --workdir /var/www/html mautibox_web ${syncMetaCommand}`,
+        { ignoreError: true } // Игнорируем ошибку, если таблица уже есть (при повторном запуске)
+      );
+      if (syncResult.success) {
+        Logger.success('   - Metadata storage synced successfully.');
+      } else {
+        Logger.warning(`   - Metadata sync command finished with an issue (might be ok): ${syncResult.output}`);
+      }
 
       // Run the actual installation with timeout using ProcessManager
       Logger.log('Starting Mautic installation...', '🚀');
