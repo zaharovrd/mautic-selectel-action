@@ -35,17 +35,21 @@ export class SSLManager {
   private async prepareForCertbot(): Promise<void> {
     Logger.log('1. Preparing Nginx for Certbot validation...', '🔧');
 
+    // --- ИЗМЕНЕНИЕ: Используем `alias` вместо `root` ---
     const preCertbotConfig = `
 server {
     listen 80;
+    listen [::]:80;
     server_name ${this.config.domainName};
 
     location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
+        # 'alias' работает надежнее для этой задачи
+        alias /var/www/certbot/.well-known/acme-challenge/;
+        # Убираем все ограничения
+        allow all;
     }
 
     location / {
-       # Временно просто отдаем 404, чтобы не проксировать трафик до получения SSL
        return 404;
     }
 }`;
@@ -57,29 +61,42 @@ server {
     await ProcessManager.runShell(`ln -sf ${configPath} /etc/nginx/sites-enabled/`);
 
     await ProcessManager.runShell('nginx -t');
-    await this.reloadNginx(); // Используем reload вместо restart для плавности
+    await this.reloadNginx();
     Logger.success('   - Nginx is ready for validation.');
   }
 
   private async obtainCertificate(): Promise<void> {
     Logger.log('2. Obtaining SSL certificate with Certbot...', '🌿');
 
-    await ProcessManager.runShell('mkdir -p /var/www/certbot', { ignoreError: true });
+    const webrootPath = '/var/www/certbot';
+
+    // --- ИЗМЕНЕНИЕ: Создаем нужную структуру и выставляем права ---
+    await ProcessManager.runShell(`mkdir -p ${webrootPath}/.well-known/acme-challenge`);
+    await ProcessManager.runShell(`chown -R www-data:www-data ${webrootPath}`);
+    Logger.success(`   - Webroot directory ${webrootPath} prepared with correct permissions.`);
 
     const certbotCommand = [
       'certbot', 'certonly', '--webroot',
-      '--webroot-path', '/var/www/certbot',
+      '--webroot-path', webrootPath,
       '--email', this.config.emailAddress,
       '--domain', this.config.domainName,
       '--rsa-key-size', '4096',
       '--agree-tos',
       '--non-interactive',
-    ].join(' '); // Убрали --force-renewal, чтобы не было ошибок при первом запуске
+    ].join(' ');
 
-    // Запускаем certbot. Если он уже есть, он ничего не сделает.
-    await ProcessManager.runShell(certbotCommand);
-    // Проверяем, что необходимые файлы настроек теперь существуют
-    await ProcessManager.runShell('test -f /etc/letsencrypt/options-ssl-nginx.conf && test -f /etc/letsencrypt/ssl-dhparams.pem');
+    const result = await ProcessManager.runShell(certbotCommand);
+
+    // После выполнения команды certbot, проверим наличие ключевых файлов
+    const checkFilesResult = await ProcessManager.runShell(
+      `test -f /etc/letsencrypt/options-ssl-nginx.conf && test -f /etc/letsencrypt/ssl-dhparams.pem`,
+      { ignoreError: true }
+    );
+
+    if (!result.success || !checkFilesResult.success) {
+      Logger.error(`Certbot process output:\n${result.output}`);
+      throw new Error(`Certbot failed to obtain certificate or create required SSL config files.`);
+    }
 
     Logger.success('   - SSL certificate and required files are in place.');
   }
@@ -89,12 +106,14 @@ server {
     const finalNginxConfig = `
 server {
     listen 80;
+    listen [::]:80;
     server_name ${this.config.domainName};
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name ${this.config.domainName};
 
     ssl_certificate /etc/letsencrypt/live/${this.config.domainName}/fullchain.pem;
