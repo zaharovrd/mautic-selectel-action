@@ -87,15 +87,54 @@ server {
 
     const result = await ProcessManager.runShell(certbotCommand);
 
-    // После выполнения команды certbot, проверим наличие ключевых файлов
-    const checkFilesResult = await ProcessManager.runShell(
+    // После выполнения команды certbot, проверим наличие сертификата и ключа
+    const liveFullchain = `/etc/letsencrypt/live/${this.config.domainName}/fullchain.pem`;
+    const livePrivkey = `/etc/letsencrypt/live/${this.config.domainName}/privkey.pem`;
+    const certFilesCheck = await ProcessManager.runShell(
+      `test -f ${liveFullchain} && test -f ${livePrivkey}`,
+      { ignoreError: true }
+    );
+
+    if (!certFilesCheck.success) {
+      // Если certbot ничего не сделал и сертификата нет — покажем вывод для диагностики
+      Logger.error(`Certbot output:\n${result.output}`);
+      throw new Error(`Certbot did not produce certificate files for ${this.config.domainName}.`);
+    }
+
+    // Проверим наличие вспомогательных файлов, которые часто создаёт Certbot
+    const helperFilesCheck = await ProcessManager.runShell(
       `test -f /etc/letsencrypt/options-ssl-nginx.conf && test -f /etc/letsencrypt/ssl-dhparams.pem`,
       { ignoreError: true }
     );
 
-    if (!result.success || !checkFilesResult.success) {
-      Logger.error(`Certbot process output:\n${result.output}`);
-      throw new Error(`Certbot failed to obtain certificate or create required SSL config files.`);
+    if (!helperFilesCheck.success) {
+      Logger.log('Helper LetsEncrypt files missing — creating defaults (options + dhparams)...', 'ℹ️');
+
+      // Создаём рекомендуемый файл настроек для nginx (обычно генерируется/предоставляется Certbot)
+      const optionsContent = `# Recommended TLS parameters
+# From: https://ssl-config.mozilla.org/#server=nginx&version=modern&config=intermediate
+ssl_session_cache shared:le_nginx_SSL:10m;
+ssl_session_timeout 1d;
+ssl_session_tickets off;
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_prefer_server_ciphers off;
+ssl_ciphers 'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256';
+
+# HSTS (modulo preload list and your use-case)
+add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+
+# OCSP stapling
+ssl_stapling on;
+ssl_stapling_verify on;`;
+
+      // Записываем файл (перезаписываем, если есть)
+      await ProcessManager.runShell(`bash -lc "cat > /etc/letsencrypt/options-ssl-nginx.conf <<'EOF'\n${optionsContent}\nEOF"`);
+
+      // Создаём dhparams (2048 — приемлемый компромисс по времени и безопасности)
+      const dhcmd = `if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048; fi`;
+      await ProcessManager.runShell(dhcmd);
+
+      Logger.success('   - Created missing helper files for LetsEncrypt (options + dhparams).');
     }
 
     Logger.success('   - SSL certificate and required files are in place.');
