@@ -156,7 +156,7 @@ export class MauticDeployer {
     try {
       // 1. Замена логотипа в шапке (Header logo)
       const navbarPath = '/var/www/html/docroot/app/bundles/CoreBundle/Resources/views/Default/navbar.html.twig';
-      const newHeaderLogoUrl = 'https://mautibox.ru/Sidebar%20Logo_130px.png';
+      const newHeaderLogoUrl = 'https://mautibox.ru/user/images/g5_helium/white.png';
       const headerSedCommand = `sed -i "s|asset('bundles/core/images/mautic_logo_white.png')|'${newHeaderLogoUrl}'|" ${navbarPath}`;
 
       await ProcessManager.runShell(`docker exec mautibox_web bash -c "${headerSedCommand}"`);
@@ -164,7 +164,7 @@ export class MauticDeployer {
 
       // 2. Замена логотипа на странице входа (Main logo)
       const loginPath = '/var/www/html/docroot/app/bundles/UserBundle/Resources/views/Security/base.html.twig';
-      const newLoginLogoUrl = 'https://mautibox.ru/Login_Logo_150px.png';
+      const newLoginLogoUrl = 'https://mautibox.ru/user/images/g5_helium/white.png';
       // Заменяем весь блок с изображением для большей надежности
       const loginSedCommand = `sed -i 's|<img.*mautic_logo_login.*>|<img src=\\"${newLoginLogoUrl}\\" class=\\"img-responsive center-block\\" style=\\"max-width: 150px;\\" />|g' ${loginPath}`;
 
@@ -451,12 +451,14 @@ MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
 MAUTIC_RUN_CRON_JOBS=true
 MAUTIC_LOCALE=${this.config.mauticLocale || 'en_US'}
 MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}
+MAUTIC_REVERSE_PROXY=true
+MAUTIC_PROXIES=['127.0.0.1', '172.16.0.0/12']
 
 # Admin Configuration
 # MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
 # MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
-# MAUTIC_ADMIN_FIRSTNAME=Admin
-# MAUTIC_ADMIN_LASTNAME=User
+MAUTIC_ADMIN_FIRSTNAME=Admin
+MAUTIC_ADMIN_LASTNAME=User
 
 # Docker Configuration - will be overridden per container
 DOCKER_MAUTIC_ROLE=mautibox_web

@@ -118,7 +118,7 @@ ssl_session_timeout 1d;
 ssl_session_tickets off;
 ssl_protocols TLSv1.2 TLSv1.3;
 ssl_prefer_server_ciphers off;
-ssl_ciphers 'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256';
+ssl_ciphers         'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256';
 
 # HSTS (modulo preload list and your use-case)
 add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
