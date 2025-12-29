@@ -128,7 +128,7 @@ ssl_stapling on;
 ssl_stapling_verify on;`;
 
       // Записываем файл (перезаписываем, если есть)
-      await ProcessManager.runShell(`bash -lc "cat > /etc/letsencrypt/options-ssl-nginx.conf <<'EOF'\n${optionsContent}\nEOF"`);
+      await Deno.writeTextFile('/etc/letsencrypt/options-ssl-nginx.conf', optionsContent);
 
       // Создаём dhparams (2048 — приемлемый компромисс по времени и безопасности)
       const dhcmd = `if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048; fi`;
