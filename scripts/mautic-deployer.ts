@@ -447,7 +447,7 @@ MAUTIC_DB_DATABASE=${this.config.mysqlDatabase}
 MAUTIC_DB_PORT=3306
 
 # Mautic Configuration
-MAUTIC_TRUSTED_PROXIES='["127.0.0.1","remote_addr","172.16.0.0/12","172.17.0.0/16"]'
+MAUTIC_TRUSTED_PROXIES=["127.0.0.1","remote_addr","172.16.0.0/12","172.17.0.0/16"]
 MAUTIC_RUN_CRON_JOBS=true
 MAUTIC_LOCALE=${this.config.mauticLocale || 'en_US'}
 MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'UTC'}
@@ -457,7 +457,7 @@ MAUTIC_REVERSE_PROXY=true
 # MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
 # MAUTIC_ADMIN_PASSWORD=${this.config.mauticPassword}
 MAUTIC_ADMIN_FIRSTNAME=Admin
-MAUTIC_ADMIN_LASTNAME=User
+MAUTIC_ADMIN_LASTNAME=MautiBox
 
 # Docker Configuration - will be overridden per container
 DOCKER_MAUTIC_ROLE=mautibox_web
