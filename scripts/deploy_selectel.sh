@@ -332,7 +332,7 @@ sleep 10
 
 echo "📊 Monitoring setup progress..."
 SSH_COMMAND_TO_MONITOR="
-TIMEOUT=500
+TIMEOUT=900
 COUNTER=0
 SUCCESS_MSG='🎉 Mautic setup completed successfully'
 LOG_FILE='/var/log/setup-dc.log'

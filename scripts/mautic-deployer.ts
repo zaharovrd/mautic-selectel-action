@@ -250,7 +250,8 @@ CSS_EOF
     try {
       // 1. Генерируем хэш пароля внутри контейнера mautibox_web
       Logger.log('   - Generating password hash...');
-      const hashCommand = `php -r "echo password_hash('${clientPassword}', PASSWORD_BCRYPT);"`;
+      const escapedPassword = clientPassword.replace(/'/g, "'\"'\"'");
+      const hashCommand = `php -r 'echo password_hash("${escapedPassword}", PASSWORD_BCRYPT);'`;
       const hashResult = await ProcessManager.runShell(
         `docker exec mautibox_web bash -c "${hashCommand}"`
       );
