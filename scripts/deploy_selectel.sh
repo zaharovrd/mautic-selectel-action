@@ -199,13 +199,15 @@ fi
 
 
 echo "📋 Creating deployment config..."
+# 1. .env - для Docker Compose и деплоя
 cat > .env <<EOF
+# Docker Compose & Deployment Variables
 VPS_NAME=${INPUT_VPS_NAME}
 IP_ADDRESS=${VPS_IP}
 DOMAIN_NAME=${INPUT_DOMAIN:-}
 BASE_DOMAIN=${INPUT_BASE_DOMAIN:-}
 MAUTIC_VERSION=${INPUT_MAUTIC_VERSION}
-MAUTIC_PORT=${MAUTIC_PORT:-8001}
+MAUTIC_PORT=${INPUT_MAUTIC_PORT:-8001}
 EMAIL_ADDRESS=${INPUT_EMAIL}
 MAUTIC_PASSWORD=${INPUT_MAUTIC_ADMIN_PASSWORD}
 CLIENT_EMAIL=${INPUT_CLIENT_EMAIL:-}
@@ -220,17 +222,50 @@ MAUTIC_LANGUAGE_PACK_URL=${INPUT_LANGUAGE_PACK_URL:-}
 GITHUB_TOKEN=${INPUT_GITHUB_TOKEN:-}
 MAUTIC_LOCALE=${INPUT_LOCALE:-"ru"}
 DEFAULT_TIMEZONE=${INPUT_DEFAULT_TIMEZONE:-"Europe/Moscow"}
+EOF
+
+chmod 600 .env
+
+# 2. .mautic_env - для конфигурации Mautic внутри контейнера
+cat > .mautic_env <<EOF
+# Database Configuration
+MAUTIC_DB_HOST=mautibox_db
+MAUTIC_DB_PORT=3306
+MAUTIC_DB_NAME=${INPUT_MYSQL_DATABASE}
+MAUTIC_DB_USER=${INPUT_MYSQL_USER}
+MAUTIC_DB_PASSWORD=${INPUT_MYSQL_PASSWORD}
+
+# MySQL Container Configuration
+MYSQL_DATABASE=${INPUT_MYSQL_DATABASE}
+MYSQL_USER=${INPUT_MYSQL_USER}
+MYSQL_PASSWORD=${INPUT_MYSQL_PASSWORD}
+MYSQL_ROOT_PASSWORD=${INPUT_MYSQL_ROOT_PASSWORD}
+
+# Mautic General Configuration
+MAUTIC_TRUSTED_PROXIES=127.0.0.1,remote_addr,172.16.0.0/12,172.17.0.0/16
+MAUTIC_RUN_CRON_JOBS=true
+DOCKER_MAUTIC_RUN_MIGRATIONS=true
+MAUTIC_LOCALE=${INPUT_LOCALE:-ru}
+MAUTIC_DEFAULT_TIMEZONE=${INPUT_DEFAULT_TIMEZONE:-Europe/Moscow}
 MAUTIC_REVERSE_PROXY=true
-MAUTIC_TRUSTED_PROXIES=["127.0.0.1","remote_addr","172.16.0.0/12","172.17.0.0/16"]
+
+# Russian Date/Time Formats
 MAUTIC_DATE_FORMAT_FULL='d.m.Y H:i:s'
 MAUTIC_DATE_FORMAT_SHORT='d.m.Y'
 MAUTIC_DATE_FORMAT_DATEONLY='d.m.Y'
 MAUTIC_DATE_FORMAT_TIMEONLY='H:i'
+
+# Installation flags
+MAUTIC_INSTALL_FORCE=true
 EOF
 
-chmod 600 .env
+chmod 600 .mautic_env
+echo "✅ .env and .mautic_env created successfully"
+
+# 3. Копируем docker-compose.yml
 cp "${ACTION_PATH}/templates/docker-compose.yml" .
-cp "${ACTION_PATH}/templates/.mautic_env.template" .
+
+# 4. Компилируем Deno скрипт
 echo "🔨 Compiling Deno script to binary..."
 if ! command -v deno &> /dev/null; then echo "📦 Installing Deno..."; curl -fsSL https://deno.land/install.sh | sh; export PATH="$HOME/.deno/bin:$PATH"; fi
 mkdir -p build
