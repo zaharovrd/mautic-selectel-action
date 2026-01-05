@@ -27,8 +27,8 @@ if ! command -v envsubst &> /dev/null; then
     fi
 fi
 
-echo "📄 Generating .mautic_env from template..."
-envsubst < .mautic_env.template > .mautic_env
+#echo "📄 Generating .mautic_env from template..."
+#envsubst < .mautic_env.template > .mautic_env
 
-chmod 600 .mautic_env
-echo "✅ .mautic_env created."
+#chmod 600 .mautic_env
+#echo "✅ .mautic_env created."
