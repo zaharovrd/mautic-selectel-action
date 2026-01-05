@@ -447,9 +447,14 @@ MAUTIC_DB_DATABASE=${this.config.mysqlDatabase}
 MAUTIC_DB_PORT=3306
 
 # Mautic Configuration
+MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
 MAUTIC_RUN_CRON_JOBS=true
 MAUTIC_LOCALE=${this.config.mauticLocale || 'ru'}
 MAUTIC_DEFAULT_TIMEZONE=${this.config.defaultTimezone || 'Europe/Moscow'}
+MAUTIC_DATE_FORMAT_FULL='d.m.Y H:i:s'
+MAUTIC_DATE_FORMAT_SHORT='d.m.Y'
+MAUTIC_DATE_FORMAT_DATEONLY='d.m.Y'
+MAUTIC_DATE_FORMAT_TIMEONLY='H:i'
 
 # Admin Configuration
 # MAUTIC_ADMIN_EMAIL=${this.config.emailAddress}
