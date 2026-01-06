@@ -17,7 +17,7 @@ MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
 # Mautic General Configuration
 # Comma-separated list of trusted proxy IPs. `remote_addr` is a special value.
 MAUTIC_REVERSE_PROXY=true
-MAUTIC_TRUSTED_PROXIES='["127.0.0.1","remote_addr","172.16.0.0/12","172.17.0.0/16"]'
+MAUTIC_TRUSTED_PROXIES=["127.0.0.1"]
 MAUTIC_RUN_CRON_JOBS=true
 DOCKER_MAUTIC_RUN_MIGRATIONS=true
 MAUTIC_LOCALE=ru

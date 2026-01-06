@@ -43,8 +43,6 @@ services:
       - DOCKER_MAUTIC_ROLE=mautic_web
       - DOCKER_MAUTIC_LOAD_TEST_DATA=false
       - DOCKER_MAUTIC_RUN_MIGRATIONS=true
-      - DOCKER_MAUTIC_TRUSTED_PROXIES=127.0.0.1,remote_addr,172.16.0.0/12,172.17.0.0/16
-      - DOCKER_MAUTIC_REVERSE_PROXY=true
     # PHP timeout settings for SMTP configuration and long-running operations
       - PHP_MAX_EXECUTION_TIME=300
       - PHP_MAX_INPUT_TIME=300
