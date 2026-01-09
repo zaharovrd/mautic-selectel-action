@@ -130,6 +130,8 @@ export class MauticDeployer {
         throw new Error('Containers failed to become healthy after update');
       }
 
+      await this.fixMauticProxyConfig();
+
       // Clear cache after update
       await this.clearCache('after update');
 
@@ -391,6 +393,8 @@ CSS_EOF
 
       // Run Mautic installation inside the container
       await this.runMauticInstallation();
+
+      await this.fixMauticProxyConfig();
 
       // Очищаем кеш, чтобы Mautic подхватил все переменные окружения из .mautic_env
       Logger.log('Applying environment configurations by clearing cache...', '⚙️');
@@ -1432,6 +1436,62 @@ EOF'`,
     } catch (error) {
       // Cache clearing is not critical - log but don't fail deployment
       Logger.error(`⚠️ Cache clearing failed ${context} (non-critical): ${error}`);
+    }
+  }
+  private async fixMauticProxyConfig(): Promise<void> {
+    Logger.log('Fixing Mautic proxy configuration to prevent redirect loops...', '🔧');
+
+    try {
+      // Используем sed для добавления trusted_proxies и reverse_proxy настроек
+      const sedCommand = `sed -i '/site_url/a\\\\        "trusted_proxies" => array("0.0.0.0/0"),\\\\n        "reverse_proxy" => true' /var/www/html/config/local.php`;
+
+      const result = await ProcessManager.runShell(
+        `docker exec mautibox_web bash -c '${sedCommand}'`,
+        { ignoreError: true }
+      );
+
+      if (result.success) {
+        Logger.success('Mautic proxy configuration fixed');
+
+        // Также добавляем trusted_hosts для безопасности
+        const trustedHostsCommand = `sed -i '/reverse_proxy/a\\\\        "trusted_hosts" => array("${this.config.domainName || 'localhost'}", "127.0.0.1")' /var/www/html/config/local.php`;
+
+        await ProcessManager.runShell(
+          `docker exec mautibox_web bash -c '${trustedHostsCommand}'`,
+          { ignoreError: true }
+        );
+
+        Logger.success('Trusted hosts configuration added');
+      } else {
+        Logger.warning('Could not fix proxy config with sed, trying alternative method...');
+        await this.fixMauticProxyConfigAlternative();
+      }
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Logger.error(`Failed to fix Mautic proxy configuration: ${errorMessage}`);
+    }
+  }
+
+  private async fixMauticProxyConfigAlternative(): Promise<void> {
+    try {
+      // Альтернативный метод: используем PHP для исправления конфигурации
+      const phpCommand = `php -r '
+      $config = include "/var/www/html/config/local.php";
+      $config["trusted_proxies"] = ["0.0.0.0/0"];
+      $config["reverse_proxy"] = true;
+      $config["trusted_hosts"] = ["${this.config.domainName || 'localhost'}", "127.0.0.1"];
+      file_put_contents("/var/www/html/config/local.php", "<?php\\n\\\$parameters = " . var_export($config, true) . ";");
+    '`;
+
+      await ProcessManager.runShell(
+        `docker exec --user www-data mautibox_web bash -c "${phpCommand}"`,
+        { ignoreError: true }
+      );
+
+      Logger.success('Mautic proxy configuration fixed (alternative method)');
+    } catch (error) {
+      Logger.error(`Alternative method also failed: ${error}`);
     }
   }
 }
