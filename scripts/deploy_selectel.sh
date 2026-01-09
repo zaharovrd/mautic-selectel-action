@@ -289,11 +289,11 @@ if [ -f /var/www/mautibox_ru.zip ]; then
         # Устанавливаем русский язык по умолчанию в конфигурации Mautic
         if [ -f "/var/www/html/config/local.php" ]; then
             echo "🔧 Setting Russian as default language..."
-            sed -i "s/'locale' => '[^']*'/'locale' => 'ru_RU'/" /var/www/html/config/local.php 2>/dev/null || \
+#            sed -i "s/'locale' => '[^']*'/'locale' => 'ru_RU'/" /var/www/html/config/local.php 2>/dev/null || \
             echo "Could not update locale in config"
         fi
     fi
-    rm -rf /tmp/mautic_translation/
+#    rm -rf /tmp/mautic_translation/
 else
     echo "⚠️ No translation archive found"
 fi
@@ -305,7 +305,7 @@ EOF
     fi
     
     # Очищаем временную директорию
-    rm -rf "$TEMP_LANG_DIR"
+#    rm -rf "$TEMP_LANG_DIR"
 fi
 
 echo "🚀 Deploying to server..."
