@@ -194,7 +194,7 @@ runs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: mautic-deployment-log
+        name: mautibox-deployment-log-${{ inputs.vps-name }}-${{ github.run_number }}
         # Убедимся, что путь к логу правильный, он создается в корне рабочего пространства
         path: ./setup-dc.log
 
