@@ -16,8 +16,16 @@ MAUTIC_ADMIN_FIRSTNAME=Admin
 MAUTIC_ADMIN_LASTNAME=User
 
 # Mautic Configuration
-MAUTIC_TRUSTED_PROXIES=["0.0.0.0/0"]
+MAUTIC_TRUSTED_PROXIES='["127.0.0.1","remote_addr","172.16.0.0/12","172.17.0.0/16"]'
 MAUTIC_RUN_CRON_JOBS=true
+MAUTIC_LOCALE=ru
+DEFAULT_TIMEZONE="Europe/Moscow"
+MAUTIC_TRANSLATION_LIST_URL='https://language-packs.mautibox.ru/manifest.json'
+MAUTIC_TRANSLATION_FETCH_URL='https://language-packs.mautibox.ru/'
+MAUTIC_STATS_UPDATE_URL='https://updates.mautibox.ru/stats/send'
+MAUTIC_INSTALL_SOURCE=MautiBox
+MAUTIC_SYSTEM_UPDATE_URL='https://api.github.com/repos/mautibox/mautibox/releases'
+MAUTIC_API_ENABLED=1
 
 # Russian Date/Time Formats
 MAUTIC_DATE_FORMAT_FULL='d.m.Y H:i:s'
