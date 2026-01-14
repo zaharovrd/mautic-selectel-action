@@ -69,20 +69,26 @@ export class SSLManager {
       const tempPath = `${configPath}.tmp`;
 
       Logger.log(`Writing configuration to temporary file: ${tempPath}`, '💾');
-      await Deno.writeTextFile(tempPath, nginxConfig);
+      // Write with explicit UTF-8 encoding to ensure proper file handling
+      await Deno.writeTextFile(tempPath, nginxConfig, { create: true });
 
       // Step 4: Verify the temporary file was written completely
       Logger.log('Verifying temporary file integrity...', '✔️');
       const tempContent = await Deno.readTextFile(tempPath);
       const contentLines = tempContent.split('\n').length;
       const originalLines = nginxConfig.split('\n').length;
+      const tempSize = new TextEncoder().encode(tempContent).length;
+      const expectedSize = new TextEncoder().encode(nginxConfig).length;
 
-      if (contentLines !== originalLines) {
+      Logger.log(`  - Expected lines: ${originalLines}, got: ${contentLines}`, '📊');
+      Logger.log(`  - Expected size: ${expectedSize} bytes, got: ${tempSize} bytes`, '📊');
+
+      if (contentLines !== originalLines || tempSize !== expectedSize) {
         throw new Error(
-          `File write verification failed: expected ${originalLines} lines, got ${contentLines}`
+          `File write verification failed: lines (${originalLines} vs ${contentLines}), size (${expectedSize} vs ${tempSize})`
         );
       }
-      Logger.log(`✓ Temporary file verified (${contentLines} lines)`, '✔️');
+      Logger.log(`✓ Temporary file verified (${contentLines} lines, ${tempSize} bytes)`, '✔️');
 
       // Step 5: Atomic rename - move temp file to final location
       Logger.log(`Moving configuration to final location: ${configPath}`, '🔄');
@@ -91,9 +97,25 @@ export class SSLManager {
       // Step 6: Verify final file exists and has correct content
       Logger.log('Verifying final file...', '✔️');
       const finalContent = await Deno.readTextFile(configPath);
+      const finalSize = new TextEncoder().encode(finalContent).length;
+      const finalLines = finalContent.split('\n').length;
+
+      Logger.log(`  - Final file size: ${finalSize} bytes (expected: ${expectedSize})`, '📊');
+      Logger.log(`  - Final file lines: ${finalLines} (expected: ${originalLines})`, '📊');
+
+      // Log file tail to verify completeness
+      const fileTail = finalContent.split('\n').slice(-5).join('\n');
+      Logger.log('  - File ends with:', '📄');
+      Logger.log(fileTail, '📋');
+
       if (!finalContent.includes('proxy_pass http://localhost:')) {
         throw new Error('Final configuration file does not contain required proxy_pass directive');
       }
+      
+      if (!finalContent.trimEnd().endsWith('}')) {
+        throw new Error('Final configuration file does not end with closing brace');
+      }
+
       Logger.log('✓ Final configuration file verified', '✔️');
 
       // Step 7: Create symlink to enabled sites
@@ -205,6 +227,16 @@ export class SSLManager {
       // Verify final configuration
       Logger.log('Verifying final Nginx configuration after certbot...', '🔍');
       const finalConfig = await Deno.readTextFile(configPath);
+      const finalConfigSize = new TextEncoder().encode(finalConfig).length;
+      const finalConfigLines = finalConfig.split('\n').length;
+
+      Logger.log(`  - Final config size: ${finalConfigSize} bytes`, '📊');
+      Logger.log(`  - Final config lines: ${finalConfigLines}`, '📊');
+
+      // Log last 10 lines to see if file is complete
+      const configTail = finalConfig.split('\n').slice(-10).join('\n');
+      Logger.log('  - File ends with:', '📄');
+      Logger.log(configTail, '📋');
 
       if (!finalConfig.includes('listen 443 ssl')) {
         Logger.warning('Warning: SSL redirect configuration may not be complete');
@@ -212,12 +244,32 @@ export class SSLManager {
         Logger.success('✓ SSL configuration successfully applied by certbot');
       }
 
-      // Check file integrity one more time
-      const finalCheckResult = await ProcessManager.runShell(
-        `wc -l ${configPath} && tail -c 50 ${configPath} | cat -A`,
-        { ignoreError: true }
-      );
-      Logger.log(`Final verification: ${finalCheckResult.output}`, '📊');
+      // Verify file completeness - must end with }
+      if (!finalConfig.trimEnd().endsWith('}')) {
+        Logger.error('ERROR: Configuration file appears to be truncated!');
+        Logger.log(`File tail characters: ${finalConfig.slice(-100)}`, '⚠️');
+        throw new Error('Configuration file truncated after certbot ran');
+      }
+
+      // Check file integrity one more time - using Deno API only (no shell)
+      try {
+        const fileStats = await Deno.stat(configPath);
+        Logger.log(`Final file stats: ${fileStats.size} bytes`, '📊');
+
+        // Re-read one final time to ensure it's complete
+        const finalRecheck = await Deno.readTextFile(configPath);
+        if (finalRecheck.length === 0) {
+          throw new Error('Configuration file is empty after certbot!');
+        }
+        if (!finalRecheck.trimEnd().endsWith('}')) {
+          throw new Error(`Configuration file is truncated (size: ${finalRecheck.length} bytes)`);
+        }
+        Logger.log('✓ File integrity confirmed', '✔️');
+      } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error';
+        Logger.error(`File integrity check failed: ${errMsg}`);
+        throw error;
+      }
 
       Logger.success('SSL certificate generated successfully');
       return true;
