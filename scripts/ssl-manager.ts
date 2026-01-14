@@ -48,6 +48,11 @@ export class SSLManager {
     Logger.log('Configuring Nginx...', '🌐');
 
     try {
+      // Type guard: ensure domainName is defined
+      if (!this.config.domainName) {
+        throw new Error('Domain name is required for Nginx setup');
+      }
+
       // Step 1: Read the full template with all proxy settings
       Logger.log('Reading Nginx template...', '🔍');
       const templatePath = 'templates/nginx-virtual-host-template';
@@ -184,7 +189,7 @@ export class SSLManager {
           { ignoreError: true }
         );
 
-        if (certCheckResult.success && certCheckResult.output.includes(this.config.domainName)) {
+        if (certCheckResult.success && this.config.domainName && certCheckResult.output.includes(this.config.domainName)) {
           Logger.warning('Certificate already exists for domain, continuing...');
           return true;
         }
