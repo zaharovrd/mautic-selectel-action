@@ -94,7 +94,7 @@ export class SSLManager {
       // Step 7: Create symlink to enabled sites
       Logger.log('Creating symlink in sites-enabled...', '🔗');
       const enabledPath = `/etc/nginx/sites-enabled/${this.config.domainName}`;
-      
+
       // Remove existing symlink if present
       try {
         await Deno.remove(enabledPath);
@@ -114,7 +114,7 @@ export class SSLManager {
       // Step 9: Test Nginx configuration
       Logger.log('Testing Nginx configuration...', '🧪');
       const testResult = await ProcessManager.runShell('nginx -t', { ignoreError: true });
-      
+
       if (!testResult.success) {
         throw new Error(`Nginx configuration test failed: ${testResult.output}`);
       }
@@ -123,7 +123,7 @@ export class SSLManager {
       // Step 10: Reload Nginx service
       Logger.log('Reloading Nginx service...', '🔄');
       const reloadResult = await ProcessManager.runShell('systemctl reload nginx', { ignoreError: true });
-      
+
       if (!reloadResult.success) {
         throw new Error(`Failed to reload Nginx: ${reloadResult.output}`);
       }
@@ -154,7 +154,7 @@ export class SSLManager {
 
     try {
       const configPath = `/etc/nginx/sites-available/${this.config.domainName}`;
-      
+
       // Ensure config file is fully written and synced before certbot touches it
       Logger.log('Verifying Nginx configuration before certbot...', '🔍');
       const preCheckResult = await ProcessManager.runShell(
@@ -200,7 +200,7 @@ export class SSLManager {
       // Verify final configuration
       Logger.log('Verifying final Nginx configuration after certbot...', '🔍');
       const finalConfig = await Deno.readTextFile(configPath);
-      
+
       if (!finalConfig.includes('listen 443 ssl')) {
         Logger.warning('Warning: SSL redirect configuration may not be complete');
       } else {
