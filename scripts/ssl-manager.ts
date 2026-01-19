@@ -53,26 +53,40 @@ export class SSLManager {
         throw new Error('Domain name is required for Nginx setup');
       }
 
-      // Step 1: Read the full template with all proxy settings
-      Logger.log('Reading Nginx template...', '🔍');
-      const templatePath = 'templates/nginx-virtual-host-template';
-      let nginxConfig = await Deno.readTextFile(templatePath);
-
-      // Step 2: Replace placeholders with actual values
-      Logger.log('Substituting configuration values...', '📝');
-      nginxConfig = nginxConfig
-        .replace(/DOMAIN_NAME/g, this.config.domainName)
-        .replace(/PORT/g, String(this.config.port));
-
-      // Step 3: Write to temporary file first (atomic write with verification)
+      // Step 1: Check if nginx config was already uploaded by deploy script
+      const uploadedConfigPath = `/var/www/nginx-virtual-host-${this.config.domainName}`;
       const configPath = `/etc/nginx/sites-available/${this.config.domainName}`;
+
+      Logger.log('Checking for pre-uploaded nginx configuration...', '🔍');
+
+      let nginxConfig: string;
+
+      try {
+        // Try to read the uploaded config file
+        nginxConfig = await Deno.readTextFile(uploadedConfigPath);
+        Logger.log('✓ Found pre-uploaded configuration file', '✔️');
+        Logger.log(`Using uploaded config from: ${uploadedConfigPath}`, '📋');
+      } catch {
+        // If not found, generate it from template as fallback
+        Logger.log('Pre-uploaded config not found, generating from template...', '⚠️');
+        const templatePath = 'templates/nginx-virtual-host-template';
+        nginxConfig = await Deno.readTextFile(templatePath);
+
+        // Replace placeholders with actual values
+        Logger.log('Substituting configuration values...', '📝');
+        nginxConfig = nginxConfig
+          .replace(/DOMAIN_NAME/g, this.config.domainName)
+          .replace(/PORT/g, String(this.config.port));
+      }
+
+      // Step 2: Write to temporary file first (atomic write with verification)
       const tempPath = `${configPath}.tmp`;
 
       Logger.log(`Writing configuration to temporary file: ${tempPath}`, '💾');
       // Write with explicit UTF-8 encoding to ensure proper file handling
       await Deno.writeTextFile(tempPath, nginxConfig, { create: true });
 
-      // Step 4: Verify the temporary file was written completely
+      // Step 3: Verify the temporary file was written completely
       Logger.log('Verifying temporary file integrity...', '✔️');
       const tempContent = await Deno.readTextFile(tempPath);
       const contentLines = tempContent.split('\n').length;
@@ -90,11 +104,11 @@ export class SSLManager {
       }
       Logger.log(`✓ Temporary file verified (${contentLines} lines, ${tempSize} bytes)`, '✔️');
 
-      // Step 5: Atomic rename - move temp file to final location
+      // Step 4: Atomic rename - move temp file to final location
       Logger.log(`Moving configuration to final location: ${configPath}`, '🔄');
       await Deno.rename(tempPath, configPath);
 
-      // Step 6: Verify final file exists and has correct content
+      // Step 5: Verify final file exists and has correct content
       Logger.log('Verifying final file...', '✔️');
       const finalContent = await Deno.readTextFile(configPath);
       const finalSize = new TextEncoder().encode(finalContent).length;
@@ -111,14 +125,14 @@ export class SSLManager {
       if (!finalContent.includes('proxy_pass http://localhost:')) {
         throw new Error('Final configuration file does not contain required proxy_pass directive');
       }
-      
+
       if (!finalContent.trimEnd().endsWith('}')) {
         throw new Error('Final configuration file does not end with closing brace');
       }
 
       Logger.log('✓ Final configuration file verified', '✔️');
 
-      // Step 7: Create symlink to enabled sites
+      // Step 6: Create symlink to enabled sites
       Logger.log('Creating symlink in sites-enabled...', '🔗');
       const enabledPath = `/etc/nginx/sites-enabled/${this.config.domainName}`;
 
@@ -134,11 +148,11 @@ export class SSLManager {
       await ProcessManager.runShell(`ln -sf ${configPath} ${enabledPath}`);
       Logger.log('✓ Symlink created', '🔗');
 
-      // Step 8: Wait a moment for filesystem to sync
+      // Step 7: Wait a moment for filesystem to sync
       Logger.log('Waiting for filesystem sync...', '⏳');
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Step 9: Test Nginx configuration
+      // Step 8: Test Nginx configuration
       Logger.log('Testing Nginx configuration...', '🧪');
       const testResult = await ProcessManager.runShell('nginx -t', { ignoreError: true });
 
@@ -147,7 +161,7 @@ export class SSLManager {
       }
       Logger.log('✓ Nginx configuration test passed', '✔️');
 
-      // Step 10: Reload Nginx service
+      // Step 9: Reload Nginx service
       Logger.log('Reloading Nginx service...', '🔄');
       const reloadResult = await ProcessManager.runShell('systemctl reload nginx', { ignoreError: true });
 

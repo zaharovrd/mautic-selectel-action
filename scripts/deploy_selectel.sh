@@ -138,6 +138,8 @@ if [ -n "$INPUT_DOMAIN" ]; then
     cp "${ACTION_PATH}/templates/nginx-virtual-host-template" "nginx-virtual-host-${INPUT_DOMAIN}"
     sed -i "s/DOMAIN_NAME/${INPUT_DOMAIN}/g" "nginx-virtual-host-${INPUT_DOMAIN}"
     sed -i "s/PORT/${MAUTIC_PORT}/g" "nginx-virtual-host-${INPUT_DOMAIN}"
+    echo "📤 Uploading nginx configuration to server..."
+    scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" "nginx-virtual-host-${INPUT_DOMAIN}" root@${VPS_IP}:/var/www/
 fi
 echo "📋 Creating deployment config..."
 cat > deploy.env << EOF
