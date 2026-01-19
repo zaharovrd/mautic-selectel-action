@@ -34,6 +34,9 @@ export class SSLManager {
         return false;
       }
 
+      // Update Mautic configuration with domain name and regenerate secret key
+      await this.updateMauticConfig();
+
       Logger.success('SSL setup completed successfully');
       return true;
 
@@ -292,6 +295,88 @@ export class SSLManager {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       Logger.error(`Certificate generation error: ${errorMessage}`);
       return false;
+    }
+  }
+
+  private async updateMauticConfig(): Promise<void> {
+    Logger.log('Updating Mautic configuration with domain name...', '⚙️');
+
+    try {
+      const configPath = '/var/www/html/docroot/../config/local.php';
+
+      // Generate a new secret key
+      Logger.log('Generating new secret key...', '🔐');
+      const secretKeyResult = await ProcessManager.runShell(
+        `php -r "echo bin2hex(random_bytes(32));"`,
+        { ignoreError: true }
+      );
+
+      if (!secretKeyResult.success) {
+        Logger.warning('Could not generate secret key using PHP, using fallback method');
+      }
+
+      const secretKey = secretKeyResult.success
+        ? secretKeyResult.output.trim()
+        : `${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+
+      Logger.log(`Generated secret key: ${secretKey.substring(0, 16)}...`, '🔐');
+
+      // Update site_url and secret_key in local.php
+      const siteUrl = `https://${this.config.domainName}`;
+
+      Logger.log(`Updating site_url to: ${siteUrl}`, '🌐');
+
+      // Update site_url
+      const updateSiteUrlCmd = `sed -i "s|'site_url' => '[^']*'|'site_url' => '${siteUrl}'|g" ${configPath}`;
+      const updateSiteUrlResult = await ProcessManager.runShell(updateSiteUrlCmd, { ignoreError: true });
+
+      if (!updateSiteUrlResult.success) {
+        Logger.warning(`Failed to update site_url: ${updateSiteUrlResult.output}`);
+      } else {
+        Logger.success('✓ site_url updated successfully');
+      }
+
+      // Update secret_key
+      const updateSecretKeyCmd = `sed -i "s/'secret_key' => '[^']*'/'secret_key' => '${secretKey}'/g" ${configPath}`;
+      const updateSecretKeyResult = await ProcessManager.runShell(updateSecretKeyCmd, { ignoreError: true });
+
+      if (!updateSecretKeyResult.success) {
+        Logger.warning(`Failed to update secret_key: ${updateSecretKeyResult.output}`);
+      } else {
+        Logger.success('✓ secret_key updated successfully');
+      }
+
+      // Verify the changes
+      Logger.log('Verifying configuration updates...', '🔍');
+      const verifyResult = await ProcessManager.runShell(
+        `grep -E "site_url|secret_key" ${configPath}`,
+        { ignoreError: true }
+      );
+
+      if (verifyResult.success) {
+        Logger.log('Updated configuration values:', '📄');
+        Logger.log(verifyResult.output, '📋');
+      }
+
+      // Clear cache to apply new configuration
+      Logger.log('Clearing cache to apply new configuration...', '🗑️');
+      const cacheResult = await ProcessManager.runShell(
+        `docker exec mautibox_web bash -c 'cd /var/www/html && rm -rf var/cache/prod/* 2>/dev/null || true'`,
+        { ignoreError: true }
+      );
+
+      if (cacheResult.success) {
+        Logger.success('✓ Cache cleared successfully');
+      } else {
+        Logger.warning('Cache clearing encountered an issue but continuing');
+      }
+
+      Logger.success('Mautic configuration updated successfully');
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Logger.warning(`Error updating Mautic configuration: ${errorMessage}`);
+      // Don't throw - this is a non-critical update
     }
   }
 }
