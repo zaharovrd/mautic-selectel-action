@@ -302,7 +302,7 @@ export class SSLManager {
     Logger.log('Updating Mautic configuration with domain name...', '⚙️');
 
     try {
-      const configPath = '/var/www/html/docroot/../config/local.php';
+      const configPath = '/var/www/html/config/local.php';
 
       // Generate a new secret key
       Logger.log('Generating new secret key...', '🔐');
