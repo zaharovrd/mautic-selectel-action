@@ -38,6 +38,7 @@ apt-get install -y \
   certbot \
   python3-certbot-nginx \
   ufw \
+  fail2ban \
   curl wget unzip git nano htop cron netcat vim
 
 echo "💾 Creating swap file for memory-intensive operations..."
@@ -96,3 +97,61 @@ echo "✅ VPS setup completed successfully"
 echo "🔍 Docker service status: $(systemctl is-active docker)"
 echo "🔍 Nginx service status: $(systemctl is-active nginx)"
 echo "🔍 UFW firewall status: $(ufw status | head -1)"
+
+echo "🛡️ Configuring Fail2Ban..."
+
+# Create custom jail configuration
+mkdir -p /etc/fail2ban/jail.d
+cat > /etc/fail2ban/jail.d/mautibox-protection.local << EOF
+# Этот файл содержит наши локальные переопределения и новые правила
+
+# Правило для защиты от сканеров WordPress/CMS
+[wordpress-scan]
+enabled  = true
+port     = http,https
+filter   = wordpress-scan
+logpath  = /var/log/nginx/access.log
+maxretry = 2
+findtime = 600
+bantime  = 86400
+
+# Правило для защиты SSH
+[sshd]
+enabled  = true
+port     = ssh
+maxretry = 3
+findtime = 600
+bantime  = 86400
+
+# Простое правило для защиты от DoS-атак на веб-сервер
+[nginx-dos]
+enabled  = true
+port     = http,https
+filter   = nginx-dos
+logpath  = /var/log/nginx/access.log
+maxretry = 100
+findtime = 60
+bantime  = 600
+EOF
+
+# Create custom filter for nginx-dos
+cat > /etc/fail2ban/filter.d/nginx-dos.conf << EOF
+[Definition]
+failregex = ^<HOST> -.*- .*HTTP/.*" .* .*$
+ignoreregex =
+EOF
+
+# Create custom filter for wordpress-scan
+cat > /etc/fail2ban/filter.d/wordpress-scan.conf << EOF
+[Definition]
+# Ищем попытки доступа к файлам/папкам WordPress и другим популярным векторам
+failregex = ^<HOST> .* "(GET|POST) .*(/wp-login.php|/wp-admin|/wp-includes|/xmlrpc.php|wlwmanifest.xml|\.env).*"
+ignoreregex =
+EOF
+
+echo "🚀 Starting and enabling Fail2Ban..."
+systemctl enable fail2ban
+systemctl start fail2ban
+
+echo "✅ Fail2Ban configured and started."
+echo "🔍 Fail2Ban service status: $(systemctl is-active fail2ban)"
