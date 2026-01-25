@@ -17,6 +17,7 @@ export interface DeploymentConfig {
   mauticVersion: string;
   mauticThemes?: string;
   mauticPlugins?: string;
+  theming?: string;
   mauticLanguagePackUrl?: string;
   mauticLocale?: string;
   defaultTimezone: string;

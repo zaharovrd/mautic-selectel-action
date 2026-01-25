@@ -115,6 +115,10 @@ inputs:
   mysql-root-password:
     description: "MySQL root password"
     required: true
+  theming:
+    description: "Enable or disable theming"
+    required: false
+    default: "true"
 
 outputs:
   vps-ip:

@@ -149,63 +149,41 @@ export class MauticDeployer {
   }
 
   /**
-   * Применяет кастомизацию white-label: заменяет логотипы и добавляет CSS.
+   * Применяет кастомизацию white-label: копирует файлы из templates/customisation.
    */
   private async applyWhiteLabeling(): Promise<void> {
     Logger.log('🎨 Применение White-Label кастомизации...', '🎨');
     try {
-      // 1. Замена логотипа в шапке (Header logo)
-      const navbarPath = '/var/www/html/docroot/app/bundles/CoreBundle/Resources/views/Default/navbar.html.twig';
-      const newHeaderLogoUrl = 'https://mautibox.ru/Sidebar%20Logo_130px.png';
-      const headerSedCommand = `sed -i "s|asset('bundles/core/images/mautic_logo_white.png')|'${newHeaderLogoUrl}'|" ${navbarPath}`;
+      const sourceDir = './templates/customisation';
 
-      await ProcessManager.runShell(`docker exec mautibox_web bash -c "${headerSedCommand}"`);
-      Logger.log('✅ Логотип в шапке заменен.', '🎨');
+      // Проверяем, существует ли директория с темами
+      try {
+        await Deno.stat(sourceDir);
+      } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+          Logger.log('Директория customisation не найдена, пропускаем применение темы.', '🎨');
+          return;
+        }
+        throw error;
+      }
 
-      // 2. Замена логотипа на странице входа (Main logo)
-      const loginPath = '/var/www/html/docroot/app/bundles/UserBundle/Resources/views/Security/base.html.twig';
-      const newLoginLogoUrl = 'https://mautibox.ru/Login_Logo_150px.png';
-      // Заменяем весь блок с изображением для большей надежности
-      const loginSedCommand = `sed -i 's|<img.*mautic_logo_login.*>|<img src=\\"${newLoginLogoUrl}\\" class=\\"img-responsive center-block\\" style=\\"max-width: 150px;\\" />|g' ${loginPath}`;
+      // Рекурсивно обходим директорию
+      const copyFiles = async (dir: string) => {
+        for await (const entry of Deno.readDir(dir)) {
+          const sourcePath = `${dir}/${entry.name}`;
+          const targetPath = sourcePath.replace(sourceDir, '/var/www/html/docroot/app/bundles');
 
-      await ProcessManager.runShell(`docker exec mautibox_web bash -c "${loginSedCommand}"`);
-      Logger.log('✅ Логотип на странице входа заменен.', '🎨');
+          if (entry.isDirectory) {
+            await ProcessManager.runShell(`docker exec mautibox_web mkdir -p ${targetPath}`);
+            await copyFiles(sourcePath);
+          } else {
+            await ProcessManager.runShell(`docker cp ${sourcePath} mautibox_web:${targetPath}`);
+            Logger.log(`✅ Файл ${entry.name} скопирован в ${targetPath}.`, '🎨');
+          }
+        }
+      };
 
-      // 3. Добавление кастомного CSS
-      const headPath = '/var/www/html/docroot/app/bundles/CoreBundle/Resources/views/Default/head.html.twig';
-      const customCssBlock = `
-        <style>
-            /* ----- Custom MautiBox Styles ----- */
-            /* Скрываем ссылки на официальные ресурсы Mautic в боковом меню */
-            #aside a[href*="mautic.org"],
-            #aside a[href$="/s/help"] {
-                display: none !important;
-            }
-            /* Пример: меняем основной цвет кнопок */
-            .btn-primary {
-                background-color: #5544B0 !important; /* Фирменный фиолетовый */
-                border-color: #413486 !important;
-            }
-            .btn-primary:hover {
-                background-color: #413486 !important;
-                border-color: #2c245a !important;
-            }
-            /* ----- End Custom Styles ----- */
-        </style>
-      `;
-
-      // Используем сложную команду `sed` для вставки многострочного блока перед </head>
-      // Сначала создаем временный файл с CSS, затем вставляем его содержимое
-      const cssInjectCommand = `
-        cat <<'CSS_EOF' > /tmp/custom-styles.html
-${customCssBlock}
-CSS_EOF
-        sed -i -e '/<\\/head>/r /tmp/custom-styles.html' ${headPath}
-        rm /tmp/custom-styles.html
-      `;
-
-      await ProcessManager.runShell(`docker exec mautibox_web bash -c "${cssInjectCommand.replace(/"/g, '\\"')}"`);
-      Logger.log('✅ Кастомные CSS стили добавлены.', '🎨');
+      await copyFiles(sourceDir);
 
       Logger.success('✅ White-Label кастомизация успешно применена.');
 
@@ -215,6 +193,8 @@ CSS_EOF
       // Не прерываем выполнение, т.к. это не критичная ошибка
     }
   }
+
+
 
   private async updateDockerComposeVersion(): Promise<void> {
     Logger.log('Updating docker-compose.yml with new version...', '📝');
@@ -680,13 +660,12 @@ PORT=${this.config.port}
       if (directory) {
         // For GitHub API zipballs, we need to handle the nested directory structure
         if (cleanUrl.includes('api.github.com')) {
-          // GitHub API creates a zip with a subdirectory named after the commit
-          extractCommand = `cd build/plugins && mkdir -p temp_extract "${directory}" && unzip -o "${fileName}" -d temp_extract && rm "${fileName}" && cd temp_extract && subdir=$(ls -1 | head -1) && if [ -d "$subdir" ]; then cp -r "$subdir"/* "../${directory}/"; fi && cd .. && rm -rf temp_extract`;
+          extractCommand = `cd build/plugins && mkdir -p temp_extract "${directory}" && unzip -o "${fileName}" -d temp_extract && rm -f "${fileName}" && cd temp_extract && subdir=$(ls -1 | head -1) && if [ -d "$subdir" ]; then cp -r "$subdir"/* "../${directory}/"; fi && cd .. && rm -rf temp_extract`;
         } else {
-          extractCommand = `cd build/plugins && mkdir -p "${directory}" && unzip -o "${fileName}" -d "${directory}" && rm "${fileName}"`;
+          extractCommand = `cd build/plugins && mkdir -p "${directory}" && unzip -o "${fileName}" -d "${directory}" && rm -f "${fileName}"`;
         }
       } else {
-        extractCommand = `cd build/plugins && unzip -o "${fileName}" && rm "${fileName}"`;
+        extractCommand = `cd build/plugins && unzip -o "${fileName}" && rm -f "${fileName}"`;
       }
 
       const extractResult = await ProcessManager.runShell(extractCommand, { ignoreError: true });
@@ -852,8 +831,7 @@ PORT=${this.config.port}
       if (directory) {
         // For GitHub API zipballs, we need to handle the nested directory structure
         if (cleanUrl.includes('api.github.com')) {
-          // GitHub API creates a zip with a subdirectory named after the commit
-          extractCommand = `mkdir -p temp_extract "${directory}" && unzip -o theme.zip -d temp_extract && rm theme.zip && cd temp_extract && subdir=$(ls -1 | head -1) && if [ -d "$subdir" ]; then cp -r "$subdir"/* "../${directory}/"; fi && cd .. && rm -rf temp_extract`;
+          extractCommand = `mkdir -p temp_extract "${directory}" && unzip -o theme.zip -d temp_extract && rm theme.zip && cd temp_extract && subdir=\$(ls -1 | head -1) && if [ -d "\$subdir" ]; then cp -r "\$subdir"/* "../${directory}/"; fi && cd .. && rm -rf temp_extract`;
         } else {
           extractCommand = `mkdir -p "${directory}" && unzip -o theme.zip -d "${directory}" && rm theme.zip`;
         }
@@ -1153,10 +1131,10 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
             Logger.log(`✅ Plugin reload successful`, '✅');
             Logger.log(reloadResult.output, '📄');
           } else {
-            Logger.log(`⚠️ Plugin reload also failed: ${reloadResult.output}`, '⚠️');
+            Logger.log(`⚠️ Plugin reload также не удалось: ${reloadResult.output}`, '⚠️');
           }
         } else {
-          Logger.log(`✅ Plugin registered with Mautic successfully`, '✅');
+          Logger.log(`✅ Плагин успешно зарегистрирован в Mautic`, '✅');
           Logger.log(consoleResult.output, '📄');
         }
 
@@ -1245,7 +1223,7 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
         '--force',
         '--no-interaction',
         '-vvv'
-      ], { timeout: 320000 }); // ProcessManager timeout slightly longer than shell timeout
+      ], { timeout: 320000 }); // ProcessManager timeout слегка больше, чем таймаут оболочки
 
 
       if (installResult.success) {
