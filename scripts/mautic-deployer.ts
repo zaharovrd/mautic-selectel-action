@@ -134,6 +134,7 @@ export class MauticDeployer {
       await this.clearCache('after update');
 
       // Применяем White-Label кастомизацию после обновления
+      Logger.log('Вызов applyWhiteLabeling из performUpdate', '🎨');
       await this.applyWhiteLabeling();
       // Очищаем кэш снова, чтобы применить изменения в шаблонах
       await this.clearCache('after applying white-labeling post-update');
@@ -154,7 +155,7 @@ export class MauticDeployer {
   private async applyWhiteLabeling(): Promise<void> {
     Logger.log('🎨 Применение White-Label кастомизации...', '🎨');
     try {
-      const sourceDir = './templates/customisation';
+      const sourceDir = '/github/workspace/templates/customisation'; // Используем абсолютный путь
 
       // Проверяем, существует ли директория с темами
       try {
@@ -336,6 +337,7 @@ export class MauticDeployer {
       }
 
       // Применяем White-Label кастомизацию
+      Logger.log('Вызов applyWhiteLabeling из performInstallation', '🎨');
       await this.applyWhiteLabeling();
       // Очищаем кэш после кастомизации для применения изменений
       await this.clearCache('after applying white-labeling');
