@@ -249,7 +249,8 @@ EOF
 fi
 
 echo "🚀 Deploying to server..."
-ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "mkdir -p /var/www"
+ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "mkdir -p /var/www/templates"
+scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" -r "${ACTION_PATH}/templates/customisation" root@${VPS_IP}:/var/www/templates/
 scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" deploy.env docker-compose.yml .mautic_env.template root@${VPS_IP}:/var/www/
 scp -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" build/setup root@${VPS_IP}:/var/www/setup
 ssh -o StrictHostKeyChecking=no -i "${TEMP_SSH_KEY_PATH}" root@${VPS_IP} "cd /var/www && chmod +x setup"
