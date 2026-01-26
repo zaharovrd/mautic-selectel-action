@@ -171,12 +171,22 @@ export class MauticDeployer {
       const copyFiles = async (dir: string) => {
         for await (const entry of Deno.readDir(dir)) {
           const sourcePath = `${dir}/${entry.name}`;
-          const targetPath = sourcePath.replace(sourceDir, '/var/www/html/docroot/app/bundles');
 
           if (entry.isDirectory) {
+            const targetPath = sourcePath.replace(sourceDir, '/var/www/html/docroot/app/bundles');
             await ProcessManager.runShell(`docker exec mautibox_web mkdir -p ${targetPath}`);
             await copyFiles(sourcePath);
-          } else {
+          } else { // It's a file
+            let targetPath: string;
+            // Special case for favicon.ico
+            if (sourcePath.endsWith('CoreBundle/Assets/images/favicon.ico')) {
+              targetPath = '/var/www/html/docroot/media/images/favicon.ico';
+              // Ensure target directory for favicon exists
+              await ProcessManager.runShell(`docker exec mautibox_web mkdir -p /var/www/html/docroot/media/images`);
+            } else {
+              // Generic rule for all other files
+              targetPath = sourcePath.replace(sourceDir, '/var/www/html/docroot/app/bundles');
+            }
             await ProcessManager.runShell(`docker cp ${sourcePath} mautibox_web:${targetPath}`);
             Logger.log(`✅ Файл ${entry.name} скопирован в ${targetPath}.`, '🎨');
           }
