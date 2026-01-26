@@ -1197,6 +1197,16 @@ echo "=== EXTRACTION PROCESS COMPLETE ==="`;
       }
 
       // Run the actual installation with timeout using ProcessManager
+      Logger.log('Syncing Doctrine metadata storage before installation...', '🗄️');
+      await ProcessManager.run([
+        'docker', 'exec',
+        '--user', 'www-data',
+        '--workdir', '/var/www/html',
+        'mautibox_web',
+        'php', './bin/console', 'doctrine:migrations:sync-metadata-storage',
+        '--no-interaction'
+      ], { ignoreError: true });
+
       Logger.log('Starting Mautic installation...', '🚀');
 
       const siteUrl = this.config.domainName
