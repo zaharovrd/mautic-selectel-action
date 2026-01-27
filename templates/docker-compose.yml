@@ -11,7 +11,7 @@ x-mautibox-volumes: &mautibox-volumes
 
 services:
   mautibox_db:
-    image: mysql:8.0
+    image: mariadb:10.11
     container_name: mautibox_db
     env_file:
       - .mautic_env
@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "--silent" ]
+      test: [ "CMD", "mariadb-admin", "ping", "-h", "localhost", "--silent" ]
       start_period: 60s
       interval: 30s
       timeout: 15s
@@ -34,8 +34,6 @@ services:
     depends_on:
       mautibox_db:
         condition: service_healthy
-    links:
-      - mautibox_db:mysql
     ports:
       - "${PORT:-8001}:80"
     env_file:
@@ -66,8 +64,6 @@ services:
     depends_on:
       mautibox_web:
         condition: service_healthy
-    links:
-      - mautibox_db:mysql
     env_file:
       - .mautic_env
     environment:
@@ -84,8 +80,6 @@ services:
     depends_on:
       mautibox_web:
         condition: service_healthy
-    links:
-      - mautibox_db:mysql
     env_file:
       - .mautic_env
     environment:
@@ -99,12 +93,12 @@ services:
       - mautibox_net
 
 volumes:
-  mautic_config:
-  mautic_plugins:
-  mautic_themes:
-  mautic_media:
-  mautic_translations:
-  mysql_data:
+  mautibox_config:
+  mautibox_plugins:
+  mautibox_themes:
+  mautibox_media:
+  mautibox_translations:
+  db_data:
 
 
 networks:
