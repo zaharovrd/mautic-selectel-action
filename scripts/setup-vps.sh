@@ -132,6 +132,12 @@ logpath  = /var/log/nginx/access.log
 maxretry = 100
 findtime = 60
 bantime  = 600
+
+[nginx-botsearch]
+enabled  = true
+logpath  = /var/log/nginx/access.log
+maxretry = 1
+bantime  = 86400
 EOF
 
 # Create custom filter for nginx-dos
@@ -147,6 +153,13 @@ cat > /etc/fail2ban/filter.d/wordpress-scan.conf << EOF
 # Ищем попытки доступа к файлам/папкам WordPress и другим популярным векторам
 failregex = ^<HOST> .* "(GET|POST) .*(/wp-login.php|/wp-admin|/wp-includes|/xmlrpc.php|wlwmanifest.xml|\.env).*"
 ignoreregex =
+EOF
+
+# Create custom filter for wordpress-scan
+cat > /etc/fail2ban/filter.d/botsearch-common.local << EOF
+[Init]
+block = \/?(<webmail>|<phpmyadmin>|<wordpress>|<scanners>|cgi-bin|mysqladmin)[^,]*
+scanners = SDK/webLanguage|\.env|\.git|\.aws/credentials|phpinfo\.php|config\.inc\.php|readme\.html|license\.txt|adminer\.php
 EOF
 
 echo "🚀 Starting and enabling Fail2Ban..."
