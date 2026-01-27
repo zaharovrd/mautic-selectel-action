@@ -2,11 +2,11 @@
 version: '3.8'
 
 x-mautibox-volumes: &mautibox-volumes
-  - mautic_config:/var/www/html/config
-  - mautic_plugins:/var/www/html/docroot/plugins
-  - mautic_themes:/var/www/html/docroot/themes
-  - mautic_media:/var/www/html/docroot/media
-  - mautic_translations:/var/www/html/docroot/translations
+  - mautibox_config:/var/www/html/config
+  - mautibox_plugins:/var/www/html/docroot/plugins
+  - mautibox_themes:/var/www/html/docroot/themes
+  - mautibox_media:/var/www/html/docroot/media
+  - mautibox_translations:/var/www/html/docroot/translations
   - ./logs:/var/www/html/var/logs
 
 services:
@@ -16,7 +16,7 @@ services:
     env_file:
       - .mautic_env
     volumes:
-      - mysql_data:/var/lib/mysql
+      - db_data:/var/lib/mysql
     restart: unless-stopped
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:

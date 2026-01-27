@@ -45,7 +45,7 @@ export class MauticDeployer {
   }
 
   private async checkMauticDirectories(): Promise<boolean> {
-    const result = await ProcessManager.runShell('test -d mautic_data && test -d mysql_data', { ignoreError: true });
+    const result = await ProcessManager.runShell('test -d mautibox_data && test -d db_data', { ignoreError: true });
     if (result.success) {
       Logger.success('✓ Mautic data directories exist');
       return true;
@@ -232,8 +232,8 @@ export class MauticDeployer {
 
     try {
       // Create data directories
-      await ProcessManager.runShell('mkdir -p mautic_data mysql_data logs');
-      await ProcessManager.runShell('chmod 755 mautic_data mysql_data logs');
+      await ProcessManager.runShell('mkdir -p mautibox_data db_data logs');
+      await ProcessManager.runShell('chmod 755 mautibox_data db_data logs');
 
       // Generate environment file
       await this.createEnvironmentFile();
