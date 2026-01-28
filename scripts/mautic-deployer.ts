@@ -364,7 +364,7 @@ export class MauticDeployer {
     Logger.log('Creating environment configuration...', '⚙️');
     const envContent = `
 # Database Configuration
-MAUTIC_DB_HOST=mysql
+MAUTIC_DB_HOST=mautibox_db
 MAUTIC_DB_USER=${this.config.mysqlUser}
 MAUTIC_DB_PASSWORD=${this.config.mysqlPassword}
 MAUTIC_DB_DATABASE=${this.config.mysqlDatabase}
