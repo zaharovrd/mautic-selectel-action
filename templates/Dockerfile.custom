@@ -3,6 +3,14 @@
 ARG MAUTIC_VERSION=6.0.5-apache
 FROM mautic/mautic:${MAUTIC_VERSION}
 
+# Fix missing GD extension dependencies (libavif.so.15 not found)
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libavif15 \
+    libaom3 \
+    libdav1d6 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy custom plugins if they exist
 COPY plugins/ /var/www/html/docroot/plugins/
 
@@ -10,6 +18,5 @@ COPY plugins/ /var/www/html/docroot/plugins/
 COPY themes/ /var/www/html/docroot/themes/
 
 # Set correct ownership
-USER root
 RUN chown -R www-data:www-data /var/www/html/docroot/plugins/ /var/www/html/docroot/themes/
 USER www-data
