@@ -102,19 +102,9 @@ echo "🛡️ Configuring Fail2Ban..."
 
 # Create custom jail configuration
 mkdir -p /etc/fail2ban/jail.d
-cat > /etc/fail2ban/jail.d/mautibox-protection.local << EOF
-# Этот файл содержит наши локальные переопределения и новые правила
-
-# Правило для защиты от сканеров WordPress/CMS
-[wordpress-scan]
-enabled  = true
-port     = http,https
-filter   = wordpress-scan
-logpath  = /var/log/nginx/access.log
-maxretry = 2
-findtime = 600
-bantime  = 86400
-
+mkdir -p /etc/fail2ban/filter.d
+echo "⚙️  Configuring Fail2Ban Jails..."
+cat > /etc/fail2ban/jail.d/mautibox-protection.local << 'EOF'
 # Правило для защиты SSH
 [sshd]
 enabled  = true
@@ -125,41 +115,47 @@ bantime  = 86400
 
 # Простое правило для защиты от DoS-атак на веб-сервер
 [nginx-dos]
+[nginx-scanners]
 enabled  = true
 port     = http,https
-filter   = nginx-dos
-logpath  = /var/log/nginx/access.log
-maxretry = 100
-findtime = 60
-bantime  = 600
-
-[nginx-botsearch]
-enabled  = true
+filter   = nginx-scanners
 logpath  = /var/log/nginx/access.log
 maxretry = 1
-bantime  = 86400
+findtime = 7200
+bantime  = 604800
+action   = iptables-multiport[name=Scanners, port="http,https", protocol=tcp]
+
+[mautic-auth]
+enabled  = true
+port     = http,https
+filter   = mautic-auth
+logpath  = /var/log/nginx/access.log
+maxretry = 5
+findtime = 600
+bantime  = 3600
 EOF
 
-# Create custom filter for nginx-dos
-cat > /etc/fail2ban/filter.d/nginx-dos.conf << EOF
+echo "⚙️  Configuring Fail2Ban Filters..."
+
+# 2. Фильтр для сканеров (с правильным экранированием %%)
+cat > /etc/fail2ban/filter.d/nginx-scanners.conf << 'EOF'
 [Definition]
-failregex = ^<HOST> -.*- .*HTTP/.*" .* .*$
-ignoreregex =
+failregex = ^<HOST> .* "(GET|POST|HEAD|OPTIONS) .*(\.env|\.git/|\.aws/|\.ssh/|\.docker/|\.vscode/|\.idea/|\.cursor/|\.continue/|\.claude/|\.cline/).*" .*$
+            ^<HOST> .* "(GET|POST|HEAD) .*(/wp-login\.php|/wp-admin|/wp-includes|xmlrpc\.php|wlwmanifest\.xml|wp-config\.php).*" .*$
+            ^<HOST> .* "(GET|POST|HEAD) .*(/vendor/phpunit/|eval-stdin\.php).*" .*$
+            ^<HOST> .* "(GET|POST|HEAD) .*(/cgi-bin/|/owa/|autodiscover\.xml|autodiscover\.json|/\+CSCOE\+|/global-protect/|sslvpn|/remote/fgt_lang).*" .*$
+            ^<HOST> .* "(GET|POST|HEAD) .*(/1c|/v83|/buh|/erp|/zup|/unf|/ut11|1c-bitrix|/bitrix/admin).*" .*$
+            ^<HOST> .* "(GET|POST|HEAD) .*(aws\.env|gcp_credentials\.json|credentials\.json|secrets\.toml|config\.json|docker-compose).*HTTP.*" .*$
+            ^<HOST> .* "(GET|POST|HEAD) .*(%%24%%7B|\$\{).*HTTP.*" .*$
+            ^<HOST> .* "(GET|POST|HEAD) .*(/phpmyadmin|/mysqladmin|/adminer\.php|phpinfo\.php).*" .*$
+ignoreregex = 
 EOF
 
-# Create custom filter for wordpress-scan
-cat > /etc/fail2ban/filter.d/wordpress-scan.conf << EOF
+# 3. Фильтр для брутфорса Mautic
+cat > /etc/fail2ban/filter.d/mautic-auth.conf << 'EOF'
 [Definition]
-# Ищем попытки доступа к файлам/папкам WordPress и другим популярным векторам
-failregex = ^<HOST> .* "(GET|POST) .*(/wp-login.php|/wp-admin|/wp-includes|/xmlrpc.php|wlwmanifest.xml|\.env).*"
-ignoreregex =
-EOF
-
-# Create custom filter for wordpress-scan
-cat > /etc/fail2ban/filter.d/botsearch-common.local << EOF
-[Init]
-block = \/?(<webmail>|<phpmyadmin>|<wordpress>|<scanners>|cgi-bin|mysqladmin)[^,]*
-scanners = SDK/webLanguage|\.env|\.git|\.aws/credentials|phpinfo\.php|config\.inc\.php|readme\.html|license\.txt|adminer\.php
+failregex = ^<HOST> .* "POST .*/s/login HTTP/.*" (200|302|403|401) .*$
+ignoreregex = 
 EOF
 
 echo "🚀 Starting and enabling Fail2Ban..."
